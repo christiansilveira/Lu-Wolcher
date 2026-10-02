@@ -102,6 +102,7 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
   const [busy, setBusy] = useState([])
   const [cq, setCq] = useState('')
   const [extra, setExtra] = useState(false) // encaixe fora do horário (só a equipe vê)
+  const [overlap, setOverlap] = useState(false) // sobrepor horário (tempo de pausa, ex.: tinta agindo)
   useEffect(() => { if (open && !edit) setF((x) => ({ ...x, date: initialDate || x.date, time: initialTime || '', barberId: initialBarber || x.barberId || data.barbers.find((b) => b.active)?.id, serviceIds: x.serviceIds.length ? x.serviceIds : [data.services.find((s) => s.active && doesService(data.barbers.find((b) => b.id === (initialBarber || x.barberId)), s.id))?.id].filter(Boolean) })); if (open && !edit && initialTime) { const h = data.settings.hours?.[weekday(initialDate || today())]; setExtra(!h || toMin(initialTime) < toMin(h[0]) || toMin(initialTime) >= toMin(h[1])) } }, [open, initialDate, initialTime, initialBarber]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (open && f.date) actions.busy(f.date).then(setBusy) }, [open, f.date, actions])
 
@@ -129,6 +130,7 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
     return freeSlots({ date: f.date, hours: data.settings.hours[weekday(f.date)], duration: Number(service.duration), step: Number(data.settings.slotStep || 30), breakTime: barber.lunch || data.settings.breakTime, busy: busy.filter((b) => b.barberId === barber.id && !(edit && f.date === edit.date && b.barberId === edit.barberId && b.time === edit.time)) })
   }, [service, barber, f.date, busy, data.settings, edit])
 
+  const picked = !edit && !!f.clientId
   const match = f.phone.length >= 4 ? data.clients.find((c) => onlyDigits(c.phone).endsWith(onlyDigits(f.phone)) && onlyDigits(f.phone).length >= 10) : null
   const groupTime = (bid, i) => gTimes[bid] || toHHMM(toMin(f.time || '00:00') + Number(service?.duration || 0) + others.slice(0, i).reduce((a, o) => a + totalDuration(f.serviceIds.filter((id) => bOf(id) === o).map(svcOf), data.barbers.find((b) => b.id === o)), 0))
   const groupBad = (bid, i) => { const t = toMin(groupTime(bid, i)); const d = totalDuration(f.serviceIds.filter((id) => bOf(id) === bid).map(svcOf), data.barbers.find((b) => b.id === bid)); return busy.some((x) => x.barberId === bid && t < toMin(x.time) + Number(x.duration) && t + d > toMin(x.time)) }
@@ -139,7 +141,7 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
       if (isAdmin && edit.clientId && (clientName !== edit.clientName || onlyDigits(phone) !== onlyDigits(edit.clientPhone))) await actions.upsert('clients', { id: edit.clientId, name: clientName, phone: onlyDigits(phone) }, null)
       await actions.updateAppointment(edit.id, { clientName, ...(isAdmin ? { clientPhone: onlyDigits(phone) } : {}), notes: f.notes, barberId: f.barberId, serviceIds: mainIds, date: f.date, time: f.time, duration: Number(service.duration), total: Number(service.price) }, 'Agendamento atualizado')
     } else {
-      const r = await actions.staffBook({ clientName, clientPhone: phone, barberId: f.barberId, serviceIds: mainIds, date: f.date, time: f.time, duration: Number(service.duration), total: Number(service.price), notes: f.notes || '' })
+      const r = await actions.staffBook({ clientId: picked ? f.clientId : null, clientName, clientPhone: phone, barberId: f.barberId, serviceIds: mainIds, date: f.date, time: f.time, duration: Number(service.duration), total: Number(service.price), notes: f.notes || '' })
       const catalog = mainIds.reduce((a, id) => a + Number(svcOf(id)?.price || 0), 0)
       if (r?.id && Math.abs(catalog - service.price) > 0.001) await actions.updateAppointment(r.id, { total: Number(service.price) })
     }
@@ -147,23 +149,31 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
     for (const [i, bid] of others.entries()) {
       const ids = f.serviceIds.filter((id) => bOf(id) === bid); const b = data.barbers.find((x) => x.id === bid)
       const total = ids.reduce((a, id) => a + priceOf(id), 0)
-      const r = await actions.staffBook({ clientName, clientPhone: phone, barberId: bid, serviceIds: ids, date: f.date, time: groupTime(bid, i), duration: totalDuration(ids.map(svcOf), b), total, notes: f.notes || '' })
+      const r = await actions.staffBook({ clientId: picked ? f.clientId : null, clientName, clientPhone: phone, barberId: bid, serviceIds: ids, date: f.date, time: groupTime(bid, i), duration: totalDuration(ids.map(svcOf), b), total, notes: f.notes || '' })
       if (r?.id && Math.abs(ids.reduce((a, id) => a + Number(svcOf(id)?.price || 0), 0) - total) > 0.001) await actions.updateAppointment(r.id, { total })
     }
-    if (!edit) setF({ ...f, name: '', phone: '', time: '', notes: '' })
+    if (!edit) setF({ ...f, clientId: null, name: '', phone: '', time: '', notes: '' })
     setAssign({}); setPrices({}); setGTimes({}); onClose()
   }
   const tMin = f.time ? toMin(f.time) : null
-  const extraOk = extra && tMin != null && service && !busy.some((b) => b.barberId === barber?.id && !(edit && f.date === edit.date && b.barberId === edit.barberId && b.time === edit.time) && tMin < toMin(b.time) + Number(b.duration) && tMin + Number(service.duration) > toMin(b.time))
+  const ovCfg = data.settings.privacy?.overlap || {}
+  const canOverlap = !!barber && (ovCfg.barbers || []).includes(barber.id)
+  const ovOn = canOverlap && overlap
+  const cap = ovOn ? Math.max(2, Number(ovCfg.max || 2)) : 1
+  const free = extra || ovOn
+  const isBlock = (b) => Number(b.duration) >= 1440 || data.blocks.some((k) => k.barberId === barber?.id && k.date === f.date && (k.start || '00:00').slice(0, 5) === b.time)
+  const clashes = (t, d) => busy.filter((b) => b.barberId === barber?.id && !(edit && f.date === edit.date && b.barberId === edit.barberId && b.time === edit.time) && t < toMin(b.time) + Number(b.duration) && t + d > toMin(b.time))
+  const fits = (t, d) => { const c = clashes(t, d); return c.length < cap && !(c.length && c.some(isBlock)) }
+  const extraOk = free && tMin != null && service && fits(tMin, Number(service.duration))
   const keep = !!edit && f.date === edit.date && f.time === edit.time && f.barberId === edit.barberId && Number(service?.duration) <= Number(edit.duration)
   // por que não dá para agendar + sugestão de horário
   const mine = busy.filter((b) => b.barberId === barber?.id && !(edit && f.date === edit.date && b.barberId === edit.barberId && b.time === edit.time))
   const dur = Number(service?.duration || 0)
   const hrs = data.settings.hours?.[weekday(f.date)]
   const lunch = barber?.lunch || data.settings.breakTime
-  const hitAt = (t, withLunch) => mine.find((b) => t < toMin(b.time) + Number(b.duration) && t + dur > toMin(b.time)) || (withLunch && lunch && t < toMin(lunch[1]) && t + dur > toMin(lunch[0]) ? { lunch: true } : null)
+  const hitAt = (t, withLunch) => (fits(t, dur) ? null : clashes(t, dur)[0]) || (withLunch && lunch && t < toMin(lunch[1]) && t + dur > toMin(lunch[0]) ? { lunch: true } : null)
   const suggest = (t) => {
-    if (!extra) return slots.find((x) => toMin(x) >= t) || slots[slots.length - 1]
+    if (!free) return slots.find((x) => toMin(x) >= t) || slots[slots.length - 1]
     for (let x = t; x + dur <= 23 * 60 + 59; x += 5) if (!hitAt(x, false)) return toHHMM(x)
     return null
   }
@@ -178,15 +188,16 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
     if (!mainIds.length) return 'Escolha pelo menos um serviço.'
     const no = f.serviceIds.find((id) => !okFor(id)); if (no) return `${data.barbers.find((b) => b.id === bOf(no))?.name.split(' ')[0]} não faz ${svcOf(no)?.name}. Escolha outra profissional para esse serviço.`
     if (!edit && !(f.name || match)) return 'Informe o nome da cliente.'
-    if (!edit && onlyDigits(f.phone).length < 10) return 'Informe o WhatsApp com DDD (ex.: 41 99999-9999).'
-    if (!f.time) return extra ? 'Digite o horário do encaixe.' : (slots.length ? 'Escolha um horário livre.' : 'Sem horário livre no expediente. Ligue "Encaixe fora do horário" para marcar mesmo assim.')
+    if (!edit && !picked && onlyDigits(f.phone).length < 10) return 'Informe o WhatsApp com DDD (ex.: 41 99999-9999).'
+    if (!f.time) return free ? 'Digite o horário.' : (slots.length ? 'Escolha um horário livre.' : 'Sem horário livre no expediente. Ligue "Encaixe fora do horário" para marcar mesmo assim.')
     const t = toMin(f.time)
-    const h = hitAt(t, !extra)
+    const h = hitAt(t, !free)
     const sug = suggest(t)
-    const tip = sug && sug !== f.time ? ` Minha sugestão: encaixar às ${sug}.` : ''
+    const tip = (sug && sug !== f.time ? ` Minha sugestão: encaixar às ${sug}.` : '') + (canOverlap && !ovOn ? ' Se a cliente estiver em pausa (ex.: tinta agindo), ligue "Sobrepor horário".' : '')
     if (h?.lunch) return `${f.time} cai no almoço dela (${lunch[0]}–${lunch[1]}).${tip} Ou ligue "Encaixe fora do horário".`
+    if (h && ovOn && !isBlock(h)) return `Já tem ${clashes(t, dur).length} atendimento(s) nesse horário. O limite de sobreposição é ${cap}.${tip}`
     if (h) { const m = whoAt(h); return `${m[0].toUpperCase()}${m.slice(1)}, e o atendimento leva ${dur} min.${tip}` }
-    if (!extra && !slots.includes(f.time) && !keep) {
+    if (!free && !slots.includes(f.time) && !keep) {
       if (barber.daysOff?.includes(weekday(f.date)) || !hrs) return 'Esse dia é folga/fechado. Ligue "Encaixe fora do horário" para marcar mesmo assim.'
       if (t < toMin(hrs[0]) || t + dur > toMin(hrs[1])) return `${f.time} + ${dur} min passa do horário de funcionamento (${hrs[0]}–${hrs[1]}). Ligue "Encaixe fora do horário" para marcar mesmo assim.`
       return `${f.time} não cabe na grade.${tip}`
@@ -194,7 +205,7 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
     const gb = others.findIndex(groupBad); if (gb >= 0) return `${data.barbers.find((b) => b.id === others[gb])?.name.split(' ')[0]} já tem atendimento às ${groupTime(others[gb], gb)}. Mude o horário dela.`
     return ''
   })()
-  const valid = (edit ? f.name : (f.name || match) && onlyDigits(f.phone).length >= 10) && mainIds.length > 0 && f.serviceIds.every(okFor) && !others.some(groupBad) && f.time && (slots.includes(f.time) || keep || extraOk) && service && barber
+  const valid = (edit ? f.name : picked || ((f.name || match) && onlyDigits(f.phone).length >= 10)) && mainIds.length > 0 && f.serviceIds.every(okFor) && !others.some(groupBad) && f.time && (slots.includes(f.time) || keep || extraOk) && service && barber
 
   return (
     <Modal open={open} onClose={onClose} title={edit ? 'Editar agendamento' : 'Novo agendamento'} footer={<>{!valid && why && <p className="form-err mb-sm" style={{ width: '100%' }}>{why}</p>}<Button block disabled={!valid} icon={Check} onClick={save}>{edit ? 'Salvar alterações' : 'Agendar'}</Button></>}>
@@ -205,11 +216,13 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
             {cq.trim().length >= 2 && (() => {
               const t = cq.trim().toLowerCase(); const d = onlyDigits(cq)
               const hits = data.clients.filter((c) => c.name.toLowerCase().includes(t) || (d.length >= 3 && onlyDigits(c.phone).includes(d))).slice(0, 6)
-              return <div className="client-hits">{hits.map((c) => <button key={c.id} type="button" onClick={() => { setF({ ...f, name: c.name, phone: onlyDigits(c.phone).startsWith('sem') ? '' : onlyDigits(c.phone) }); setCq('') }}><b>{c.name}</b><small>{fmtPhone(c.phone)}</small></button>)}{!hits.length && <small className="muted">Nenhuma cliente encontrada. Preencha abaixo para cadastrar.</small>}</div>
+              return <div className="client-hits">{hits.map((c) => <button key={c.id} type="button" onClick={() => { setF({ ...f, clientId: c.id, name: c.name, phone: onlyDigits(c.phone).startsWith('sem') ? '' : onlyDigits(c.phone) }); setCq('') }}><b>{c.name}</b><small>{onlyDigits(c.phone).length >= 10 ? fmtPhone(c.phone) : 'WhatsApp oculto'}</small></button>)}{!hits.length && <small className="muted">Nenhuma cliente encontrada. Preencha abaixo para cadastrar.</small>}</div>
             })()}
           </Field>
         )}
-        {!edit && <Field label="WhatsApp do cliente" required><input inputMode="tel" value={maskPhone(f.phone)} onChange={(e) => setF({ ...f, phone: onlyDigits(e.target.value) })} placeholder="(41) 99999-9999" /></Field>}
+        {!edit && (picked
+          ? <Field label="Cliente cadastrada"><div className="picked-client"><b>{f.name}</b><small>{onlyDigits(f.phone).length >= 10 ? maskPhone(f.phone) : 'WhatsApp oculto pela privacidade'}</small><button type="button" className="link-btn" onClick={() => setF({ ...f, clientId: null, name: '', phone: '' })}>Trocar</button></div></Field>
+          : <Field label="WhatsApp do cliente" required><input inputMode="tel" value={maskPhone(f.phone)} onChange={(e) => setF({ ...f, phone: onlyDigits(e.target.value) })} placeholder="(41) 99999-9999" /></Field>)}
         <Field label="Nome" required hint={match && !edit ? `Cliente encontrado: ${match.name}` : ''}><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={match?.name || 'Nome do cliente'} /></Field>
         <Field label={`Serviços${service ? ` · ${money(service.price)} · ${service.duration} min` : ''}`} required className="span-2">
           <div className="days">
@@ -252,12 +265,13 @@ export function NewAppointmentModal({ open, onClose, date: initialDate, time: in
         )}
       </div>
       <label className="toggle-row mb-sm"><span><b>Encaixe fora do horário</b><small>Ex.: bem cedo ou depois de fechar. Só a equipe vê; a cliente não consegue marcar nesses horários pelo site.</small></span><span className="switch"><input type="checkbox" checked={extra} onChange={(e) => setExtra(e.target.checked)} /><span /></span></label>
-      {extra && (
-        <Field label="Horário do encaixe" required >
+      {canOverlap && <label className="toggle-row mb-sm"><span><b>Sobrepor horário (tempo de pausa)</b><small>Ex.: enquanto a tinta age, marque outra cliente no mesmo horário. Até {Math.max(2, Number(ovCfg.max || 2))} atendimentos ao mesmo tempo. Só a equipe usa; o site continua normal.</small></span><span className="switch"><input type="checkbox" checked={overlap} onChange={(e) => setOverlap(e.target.checked)} /><span /></span></label>}
+      {free && (
+        <Field label={ovOn ? 'Horário (pode sobrepor)' : 'Horário do encaixe'} required >
           <input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
         </Field>
       )}
-      {!extra && <Field label="Horário livre" required>
+      {!free && <Field label="Horário livre" required>
         {keep && <p className="muted small">Mantendo {f.time}. Para mudar, escolha outro horário abaixo.</p>}
         {f.time && !keep && !slots.includes(f.time) && <p className="form-err">{why || `O horário ${f.time} não está na grade.`}</p>}
         {slots.length ? (
@@ -279,7 +293,7 @@ export function ApptRow({ a, onClick, showBarber = true }) {
         <b>{a.status === 'confirmado' ? '✅ ' : ''}{a.clientName}</b>
         <small>{serviceNames(a, data.services)}{showBarber && b ? ` · ${b.name.split(' ')[0]}` : ''}</small>
       </span>
-      {showBarber && b && <Avatar name={b.name} color={b.color} size={28} />}
+      {showBarber && b && <Avatar name={b.name} color={b.color} photo={b?.photo} size={28} />}
       <StatusBadge status={a.status} />
     </button>
   )

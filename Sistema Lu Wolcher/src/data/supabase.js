@@ -55,7 +55,7 @@ export function createSupabaseDB(url, key) {
         all('settings'), all('services', (q) => q.order('order')), all('products', (q) => q.order('name')), all('barbers', (q) => q.order('name')),
         allPaged('sales', (q) => q.gte('date', from)), all('payouts'), all('cash', (q) => q.order('opened_at', { ascending: false }).limit(60)),
         all('plans', (q) => q.order('order')), all('subscriptions'), allPaged('blocks', (q) => q.gte('date', from)),
-        all('reviews'), all('promos'), all('photos', (q) => q.order('created_at').limit(400)), all('announcements', (q) => q.order('created_at', { ascending: false }).limit(100)),
+        all('reviews'), all('promos'), all('photos', (q) => q.order('created_at', { ascending: false }).limit(400)), all('announcements', (q) => q.order('created_at', { ascending: false }).limit(100)),
       ])
       let clients; let appointments; let waitlist = []; let expenses = []; let staff = []
       if (pro) {
@@ -107,6 +107,10 @@ export function createSupabaseDB(url, key) {
     },
 
     async book(p) {
+      if (p.clientId && onlyDigits(p.clientPhone).length < 10) {
+        const id = must(await sb.rpc('staff_book_client', { p_client_id: p.clientId, p_barber_id: p.barberId, p_service_ids: p.serviceIds, p_date: p.date, p_time: p.time, p_duration: p.duration, p_total: p.total, p_notes: p.notes || '' }))
+        return { ...p, id, status: 'agendado' }
+      }
       const id = must(await sb.rpc('book_appointment', {
         p_client_name: p.clientName, p_client_phone: onlyDigits(p.clientPhone), p_barber_id: p.barberId,
         p_service_ids: p.serviceIds, p_date: p.date, p_time: p.time, p_duration: p.duration, p_total: p.total,
@@ -167,12 +171,28 @@ export function createSupabaseDB(url, key) {
     },
     async reviewTarget(saleId) { const r = must(await sb.rpc('review_target', { p_sale_id: saleId })); return r ? fromDb(r) : null },
     async submitReview({ saleId, stars, comment }) { must(await sb.rpc('submit_review', { p_sale_id: saleId, p_stars: stars, p_comment: comment || '' })) },
+    async uploadAvatar(barberId, dataUrl) {
+      const blob = await (await fetch(dataUrl)).blob()
+      const path = `${barberId || 'equipe'}/avatar-${Date.now()}.jpg`
+      must(await sb.storage.from('portfolio').upload(path, blob, { contentType: 'image/jpeg' }))
+      return sb.storage.from('portfolio').getPublicUrl(path).data.publicUrl
+    },
     async savePhoto({ barberId, clientId, appointmentId, dataUrl, caption, isPrivate = false }) {
       const blob = await (await fetch(dataUrl)).blob()
       const path = `${barberId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
       must(await sb.storage.from('portfolio').upload(path, blob, { contentType: 'image/jpeg' }))
       const url = sb.storage.from('portfolio').getPublicUrl(path).data.publicUrl
       return fromDb(must(await sb.from('photos').insert(toDb({ barberId, clientId, appointmentId, url, caption, private: isPrivate })).select().single()))
+    },
+    async backup() {
+      const T = ['settings', 'services', 'products', 'barbers', 'clients', 'appointments', 'sales', 'payouts', 'cash', 'plans', 'subscriptions', 'waitlist', 'blocks', 'reviews', 'promos', 'photos', 'expenses', 'announcements']
+      const out = {}
+      for (const t of T) out[t] = await allPaged(t)
+      return out
+    },
+    async deletePhoto(id) {
+      const path = must(await sb.rpc('delete_photo', { p_id: id }))
+      if (path) await sb.storage.from('portfolio').remove([decodeURIComponent(path)])
     },
     async bulkImport({ services = [], products = [], clients = [] }) {
       const [sv, pr] = await Promise.all([all('services'), all('products')])

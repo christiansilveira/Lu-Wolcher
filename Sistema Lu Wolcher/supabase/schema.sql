@@ -238,9 +238,10 @@ create or replace function my_barber_id() returns text language sql stable secur
 $$ select barber_id from staff where user_id = auth.uid() $$;
 
 -- Vitrine pública das profissionais (sem telefone e sem comissões; só o tempo de cada procedimento)
+alter table barbers add column if not exists photo text;
 drop view if exists barbers_public;
 create view barbers_public as
-  select b.id, b.name, b.color, b.days_off, b.active, b.bio, b.service_ids, b.lunch, b.room,
+  select b.id, b.name, b.color, b.days_off, b.active, b.bio, b.service_ids, b.lunch, b.room, b.photo,
          coalesce((select jsonb_object_agg(e.key, e.value->'duration') from jsonb_each(b.service_overrides) e
                    where coalesce(e.value->>'duration', '') <> ''), '{}'::jsonb) as durations,
          coalesce((select avg(stars) from reviews r where r.barber_id = b.id), 0) as rating_avg,
@@ -268,6 +269,14 @@ language sql stable security definer set search_path = public as $$
 $$;
 grant execute on function get_busy(date) to anon, authenticated;
 
+-- Agenda sobreposta (Ajustes → tempo de pausa): quantos atendimentos ao mesmo tempo.
+-- Só pelo painel (equipe) e só para as profissionais liberadas; o site continua 1.
+create or replace function overlap_cap(p_barber_id text) returns int
+language sql stable security definer set search_path = public as $$
+  select case when is_staff() and coalesce((select (privacy->'overlap'->'barbers') ? p_barber_id from settings where id = 'main'), false)
+    then greatest(2, coalesce((select (privacy->'overlap'->>'max')::int from settings where id = 'main'), 2)) else 1 end
+$$;
+
 -- Agendamento público, com checagem de conflito dentro do banco
 create or replace function book_appointment(
   p_client_name text, p_client_phone text, p_barber_id text, p_service_ids text[],
@@ -293,12 +302,11 @@ begin
   if v_dur = 0 then raise exception 'Serviço inválido'; end if;
 
   perform pg_advisory_xact_lock(hashtext(p_barber_id || p_date::text));
-  if exists(
-    select 1 from appointments a
+  if (select count(*) from appointments a
     where a.barber_id = p_barber_id and a.date = p_date and a.status not in ('cancelado','faltou')
       and p_time < a.time + make_interval(mins => a.duration)
       and p_time + make_interval(mins => v_dur) > a.time
-  ) then raise exception 'Esse horário acabou de ser reservado. Escolha outro, por favor.'; end if;
+  ) >= overlap_cap(p_barber_id) then raise exception 'Esse horário acabou de ser reservado. Escolha outro, por favor.'; end if;
   if exists(
     select 1 from appointments a join barbers b1 on b1.id = a.barber_id join barbers me on me.id = p_barber_id
     where a.barber_id <> p_barber_id and coalesce(trim(me.room), '') <> '' and lower(trim(b1.room)) = lower(trim(me.room))
@@ -325,6 +333,20 @@ begin
 end $$;
 grant execute on function book_appointment(text,text,text,text[],date,time,int,numeric,text,text,text,jsonb) to anon, authenticated;
 
+-- Agendar cliente já cadastrada pelo painel sem expor o telefone (privacidade ligada)
+create or replace function staff_book_client(p_client_id text, p_barber_id text, p_service_ids text[], p_date date, p_time time,
+  p_duration int, p_total numeric, p_notes text default '') returns text
+language plpgsql security definer set search_path = public as $$
+declare c clients;
+begin
+  if not is_staff() then raise exception 'Sem permissão'; end if;
+  select * into c from clients where id = p_client_id;
+  if not found then raise exception 'Cliente não encontrada'; end if;
+  if length(regexp_replace(c.phone, '\D', '', 'g')) < 10 then raise exception 'Essa cliente está sem WhatsApp no cadastro. Peça para a gestão completar.'; end if;
+  return book_appointment(c.name, c.phone, p_barber_id, p_service_ids, p_date, p_time, p_duration, p_total, 'balcao', coalesce(p_notes, ''), null, null);
+end $$;
+grant execute on function staff_book_client(text,text,text[],date,time,int,numeric,text) to authenticated;
+
 -- Venda (PDV): grava, baixa estoque e conclui o atendimento numa transação
 create or replace function create_sale(p_sale jsonb) returns text
 language plpgsql security definer set search_path = public as $$
@@ -333,6 +355,11 @@ begin
   if not is_staff() then raise exception 'Sem permissão'; end if;
   if not is_admin() and (p_sale->>'barber_id') is distinct from my_barber_id() then raise exception 'Você só pode lançar vendas suas'; end if;
   if not is_admin() and not coalesce((select (privacy->'billingAllowed') ? my_barber_id() from settings where id = 'main'), false) then raise exception 'Cobrança liberada só para a gestão'; end if;
+  -- trava contra cobrança em dobro (duplo toque, dois aparelhos)
+  if nullif(p_sale->>'appointment_id','') is not null then
+    perform pg_advisory_xact_lock(hashtext('sale' || (p_sale->>'appointment_id')));
+    if exists(select 1 from sales where appointment_id = p_sale->>'appointment_id') then raise exception 'Esse atendimento já foi cobrado. Veja em Caixa → Vendas.'; end if;
+  end if;
   insert into sales(date, time, barber_id, client_id, client_name, appointment_id, items, subtotal, discount, total, payment, commission_total, benefit, loyalty_redeemed)
   values (coalesce((p_sale->>'date')::date, current_date), coalesce((p_sale->>'time')::time, localtime), p_sale->>'barber_id',
           nullif(p_sale->>'client_id',''), coalesce(p_sale->>'client_name','Cliente avulso'), nullif(p_sale->>'appointment_id',''),
@@ -364,8 +391,13 @@ begin
   for it in select * from jsonb_array_elements(s.items) loop
     if it->>'type' = 'product' then update products set stock = stock + (it->>'qty')::int where id = it->>'refId'; end if;
   end loop;
-  update appointments set status = 'confirmado', sale_id = null where id = s.appointment_id;
   delete from sales where id = p_id;
+  -- só reabre o atendimento se não sobrou outra venda dele
+  if not exists(select 1 from sales where appointment_id = s.appointment_id) then
+    update appointments set status = 'confirmado', sale_id = null where id = s.appointment_id;
+  else
+    update appointments set sale_id = (select id from sales where appointment_id = s.appointment_id limit 1) where id = s.appointment_id;
+  end if;
 end $$;
 grant execute on function delete_sale(text) to authenticated;
 
@@ -492,6 +524,19 @@ drop policy if exists "expenses_admin" on expenses; create policy "expenses_admi
 -- Storage: fotos do portfólio (bucket público só para leitura)
 insert into storage.buckets (id, name, public) values ('portfolio', 'portfolio', true) on conflict (id) do nothing;
 drop policy if exists "portfolio_read" on storage.objects;  create policy "portfolio_read" on storage.objects for select using (bucket_id = 'portfolio');
+-- excluir foto: a dona exclui qualquer uma; a profissional só as dela (pasta = id dela)
+drop policy if exists "portfolio_delete" on storage.objects; create policy "portfolio_delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'portfolio' and (public.is_admin() or split_part(name, '/', 1) = public.my_barber_id()));
+create or replace function public.delete_photo(p_id text) returns text
+language plpgsql security definer set search_path = public as $$
+declare p photos;
+begin
+  select * into p from photos where id = p_id; if not found then return null; end if;
+  if not (is_admin() or (is_staff() and p.barber_id = my_barber_id())) then raise exception 'Você só pode excluir fotos suas'; end if;
+  delete from photos where id = p_id;
+  return nullif(split_part(p.url, '/portfolio/', 2), '');
+end $$;
+grant execute on function public.delete_photo(text) to authenticated;
 drop policy if exists "portfolio_write" on storage.objects; create policy "portfolio_write" on storage.objects for insert to authenticated with check (bucket_id = 'portfolio' and public.is_staff());
 
 drop policy if exists "ann_read" on announcements;  create policy "ann_read" on announcements for select to authenticated using (is_admin() or (is_staff() and (audience = 'all' or audience = my_barber_id())));
@@ -533,8 +578,8 @@ begin
       into v_total, v_dur
       from services s cross join (select service_overrides from barbers where id = a.barber_id) b where s.id = any(v_svc);
     if v_dur = 0 then raise exception 'Serviço inválido'; end if;
-    if exists(select 1 from appointments x where x.id <> p_id and x.barber_id = a.barber_id and x.date = v_date and x.status not in ('cancelado','faltou')
-      and v_time < x.time + make_interval(mins => x.duration) and v_time + make_interval(mins => v_dur) > x.time)
+    if (select count(*) from appointments x where x.id <> p_id and x.barber_id = a.barber_id and x.date = v_date and x.status not in ('cancelado','faltou')
+      and v_time < x.time + make_interval(mins => x.duration) and v_time + make_interval(mins => v_dur) > x.time) >= overlap_cap(a.barber_id)
     then raise exception 'Conflito com outro agendamento nesse horário'; end if;
     update appointments set date = v_date, time = v_time, service_ids = v_svc, duration = v_dur, total = v_total where id = p_id;
   end if;

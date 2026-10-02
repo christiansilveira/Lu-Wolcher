@@ -13,3 +13,7 @@
   --v-on-grad: #14235C;
   color-scheme: dark;
 }
+
+/* fundo da tela: tom da marca em cima e embaixo, claro no meio */
+:root, :root[data-bb-theme="light"] { --v-bg-top: #D5DBF4; --v-bg-mid: #FDFCFF; --v-bg-bot: #F4DEDB; }
+:root[data-bb-theme="dark"] { --v-bg-top: #1A2350; --v-bg-mid: #0C1230; --v-bg-bot: #2A1C2C; }

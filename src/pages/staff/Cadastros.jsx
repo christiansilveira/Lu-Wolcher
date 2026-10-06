@@ -190,7 +190,7 @@ export function ClientModal({ c: raw, onClose, restricted = false }) {
                   <small>Total: {money(s.total)} · Pago via: {s.payment || 'Não inf.'}</small>
                 </span>
                 <button className="icon-btn sm" title="Editar Comanda" onClick={() => {
-                  window.location.hash = `#/caixa?edit=${s.id}`;
+                  window.location.hash = `#/painel/caixa?edit=${s.id}`;
                   onClose();
                 }}>
                   <Pencil size={16} />

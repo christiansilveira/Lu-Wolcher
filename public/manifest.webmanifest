@@ -1,0 +1,17 @@
+{
+  "name": "Lu Wolcher Estética Avançada",
+  "short_name": "Lu Wolcher",
+  "description": "Agendamento e gestão da Lu Wolcher Estética Avançada",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF7F6",
+  "theme_color": "#FBF7F6",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

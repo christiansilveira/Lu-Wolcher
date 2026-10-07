@@ -189,12 +189,6 @@ export function ClientModal({ c: raw, onClose, restricted = false }) {
                   <b>{s.items?.map(i => i.name).join(', ') || 'Comanda fechada'}</b>
                   <small>Total: {money(s.total)} · Pago via: {s.payment || 'Não inf.'}</small>
                 </span>
-                <button className="icon-btn sm" title="Editar Comanda" onClick={() => {
-                  window.location.hash = `#/painel/caixa?edit=${s.id}`;
-                  onClose();
-                }}>
-                  <Pencil size={16} />
-                </button>
               </div>
             ))}
             {!salesHistory.length && <Empty title="Sem comandas" text="As comandas e vendas finalizadas aparecem aqui." />}

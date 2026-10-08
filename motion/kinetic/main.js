@@ -329,18 +329,139 @@ function sEnd(b) {
   if (pk > 0) { c.save(); c.translate(CX, 1700); c.scale(pk, pk); c.fillStyle = INK; rr(-(W - 128) / 2, -60, W - 128, 120, 60); c.fill(); T('A S T R O V I A', 0, 15, `500 34px ${G}`, IVORY, { a: 'center', ls: 6 }); c.restore() }
 }
 
+
+/* =========================================================
+   1b · TAKE "UAU" 1 (beats 7–14): a palavra AGENDA vira a agenda
+   ========================================================= */
+const MORPH = (() => {
+  const f = `700 230px ${G}`, word = 'AGENDA', ls = -230 * 0.04
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = 400; const x = cv.getContext('2d')
+  x.font = f; x.letterSpacing = ls + 'px'; x.fillStyle = IVORY; x.textBaseline = 'alphabetic'
+  const total = x.measureText(word).width, x0 = CX - total / 2
+  x.fillText(word, x0, 300) // linha de base em y=300 no buffer → y=900 na tela
+  const letters = []
+  for (let i = 0; i < word.length; i++) { const a = x0 + x.measureText(word.slice(0, i)).width, bb = x0 + x.measureText(word.slice(0, i + 1)).width; letters.push([a, bb]) }
+  const top = 300 - 170, bot = 300 + 6, N = 3, pieces = []
+  letters.forEach(([a, bb], li) => { for (let k = 0; k < N; k++) { const y0 = top + ((bot - top) * k) / N; pieces.push({ sx: a, sy: y0, sw: bb - a + 4, sh: (bot - top) / N, li, k }) } })
+  // alvos: 3 colunas × 6 blocos da agenda
+  const STATUS = [['#ECE8FF', '#6B4CFF'], ['#FFE4F0', MAG], ['#DFF6F2', '#14A893'], ['#EFEFF3', '#9A97A8']]
+  const NAMES = ['Limpeza de Pele', 'Protocolo Glow', 'Microagulhamento', 'Drenagem', 'Lash Lifting', 'Radiofrequência', 'Massagem', 'Sobrancelha', 'Peeling']
+  const CLI = ['Ana R.', 'Bruna S.', 'Paula M.', 'Lia C.', 'Rita F.', 'Júlia P.', 'Gabi T.', 'Sofia L.', 'Duda A.', 'Bia N.', 'Carla M.', 'Lu K.']
+  pieces.forEach((p, i) => {
+    const col = i % 3, row = Math.floor(i / 3), st = STATUS[(i * 7 + row) % 4]
+    p.tx = 214 + col * 268; p.ty = 664 + row * 152; p.tw = 252; p.th = 136
+    p.bg = st[0]; p.bar = st[1]; p.name = NAMES[(i * 5) % NAMES.length]; p.cli = CLI[i % CLI.length]
+    p.delay = (p.li * 0.09 + p.k * 0.05) + rnd(i) * 0.08; p.rot = (rnd(i + 9) - 0.5) * 0.9
+  })
+  return { cv, pieces }
+})()
+function sMorph(b) {
+  const u = b - 7
+  fill(INK); grid(IVORY, 0.05)
+  meta(IVORY, '(00) DO PAPEL AO SISTEMA', 'ASTROVIA', 104, 0.7)
+  // as outras palavras do gancho caem
+  HOOK.forEach((w, i) => {
+    if (w.t === 'AGENDA') return
+    const k = seg(u, i * 0.06, 0.7); if (k >= 1) return
+    const f = `${w.w} ${w.s}px ${G}`, x = w.x ?? CX, a = w.a || (w.x ? 'left' : 'center')
+    c.save(); c.globalAlpha = 1 - eOut(k); c.translate(0, eOut(k) * k * 900); T(w.t, x, w.y, f, w.col || IVORY, { a, ls: -w.s * 0.04 }); c.restore()
+  })
+  // cartão da agenda surge por trás
+  const ck = eExpo(seg(u, 2.2, 0.8))
+  if (ck > 0) {
+    c.save(); c.globalAlpha = ck; card(70, 520, 940, 1110, 44, '#fff', 0.5, 80)
+    T('Hoje', 110, 600, `800 44px ${UI}`, INK); T('18 atendimentos · R$ 3.950', 230, 600, `500 26px ${UI}`, GREY)
+    c.fillStyle = MAG; rr(806, 566, 170, 46, 23); c.fill(); T('Ao vivo', 891, 598, `700 22px ${UI}`, '#fff', { a: 'center' })
+    for (let h = 0; h < 6; h++) { c.fillStyle = '#EFEDF4'; c.fillRect(200, 656 + h * 152, 790, 2); T(`${9 + h}:00`, 96, 674 + h * 152, `400 22px ${M}`, GREY) }
+    c.restore()
+  }
+  // fatias das letras voam e viram blocos de horário
+  MORPH.pieces.forEach((p) => {
+    const k = eQIO(seg(u, 0.9 + p.delay, 1.3)), bk = seg(u, 1.5 + p.delay, 0.6)
+    const x = lerp(p.sx, p.tx, k), y = lerp(p.sy + 600, p.ty, k), w = lerp(p.sw, p.tw, k), h = lerp(p.sh, p.th, k)
+    const rot = Math.sin(k * Math.PI) * p.rot
+    c.save(); c.translate(x + w / 2, y + h / 2); c.rotate(rot); c.translate(-w / 2, -h / 2)
+    if (bk < 1) { c.globalAlpha = 1 - bk; c.drawImage(MORPH.cv, p.sx, p.sy, p.sw, p.sh, 0, 0, w, h) }
+    if (bk > 0) {
+      c.globalAlpha = bk; c.fillStyle = p.bg; rr(0, 0, w, h, 14 * k); c.fill(); c.fillStyle = p.bar; rr(0, 0, 7, h, [14, 0, 0, 14]); c.fill()
+      const tk = seg(u, 2.4 + p.delay, 0.4)
+      if (tk > 0) { c.globalAlpha = tk; T(p.name, 22, 46, `700 24px ${UI}`, INK, { ls: -0.5 }); T(p.cli, 22, 78, `500 21px ${UI}`, '#5E5A6E'); c.fillStyle = p.bar; c.beginPath(); c.arc(w - 22, 30, 7, 0, 7); c.fill() }
+    }
+    c.restore()
+  })
+  // linha do "agora" percorrendo
+  const nk = seg(u, 3.4, 2.4)
+  if (nk > 0) { const ny = lerp(700, 1500, eIO(nk)); c.fillStyle = MAG; c.fillRect(200, ny - 1.5, 790, 3); c.beginPath(); c.arc(200, ny, 9, 0, 7); c.fill() }
+  rise('Da palavra', 64, 300, `700 92px ${G}`, 92, IVORY, seg(u, 2.6, 0.5), { ls: -4 })
+  rise('ao sistema.', 64, 392, `700 92px ${G}`, 92, MAG, seg(u, 2.9, 0.5), { ls: -4 })
+  // íris marfim abrindo para a marca
+  const ik = eQIO(seg(u, 6.2, 0.8))
+  if (ik > 0) { c.fillStyle = IVORY; c.beginPath(); c.arc(CX, 960, ik * 1200, 0, 7); c.fill() }
+}
+
+/* =========================================================
+   6b · TAKE "UAU" 2 (beats 46–52): a tela vira poeira e forma ASTROVIA
+   ========================================================= */
+let DUST = null
+function buildDust() {
+  const im = IMG.booking, cw = 700, ch = 1180, x0 = CX - cw / 2, y0 = 380, sy = 200
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const x = cv.getContext('2d')
+  x.beginPath(); x.roundRect(0, 0, cw, ch, 44); x.clip(); x.drawImage(im, 0, sy, im.width, ch * (im.width / cw), 0, 0, cw, ch)
+  const px = x.getImageData(0, 0, cw, ch).data, src = [], STEP = 9
+  for (let yy = 0; yy < ch; yy += STEP) for (let xx = 0; xx < cw; xx += STEP) { const i = (yy * cw + xx) * 4; if (px[i + 3] > 10) src.push({ x: x0 + xx, y: y0 + yy, r: px[i], g: px[i + 1], b: px[i + 2] }) }
+  const tc = document.createElement('canvas'); tc.width = W; tc.height = 400; const tx = tc.getContext('2d')
+  tx.font = `700 230px ${G}`; tx.letterSpacing = '-12px'; tx.textAlign = 'center'; tx.fillStyle = '#fff'; tx.fillText('ASTROVIA', CX, 290)
+  const td = tx.getImageData(0, 0, W, 400).data, tgt = []
+  for (let yy = 0; yy < 400; yy += 5) for (let xx = 0; xx < W; xx += 5) if (td[(yy * W + xx) * 4 + 3] > 128) tgt.push({ x: xx, y: 760 + yy })
+  src.sort((a, b2) => a.x - b2.x || a.y - b2.y); tgt.sort((a, b2) => a.x - b2.x || a.y - b2.y)
+  src.forEach((p, i) => {
+    const t = tgt[Math.floor((i / src.length) * tgt.length)]
+    p.ex = t.x + (rnd(i) - 0.5) * 3; p.ey = t.y + (rnd(i + 1) - 0.5) * 3
+    p.mx = p.x + 160 + rnd(i + 2) * 520; p.my = p.y + (rnd(i + 3) - 0.5) * 520
+    p.rel = 0.6 + ((p.x - x0) / cw) * 1.2 + rnd(i + 4) * 0.15; p.back = 2.5 + rnd(i + 5) * 0.6; p.mag = rnd(i + 6) < 0.18
+  })
+  DUST = { cv, src, x0, y0, cw, ch }
+}
+function sDust(b) {
+  const u = b - 46
+  fill(INK)
+  c.save(); c.globalAlpha = 0.16; c.fillStyle = IVORY; for (let x = 36; x < W; x += 48) for (let y = 36; y < H; y += 48) c.fillRect(x, y, 2, 2); c.restore()
+  meta(IVORY, '(04) ASSINATURA', 'ASTROVIA SOLUTIONS', 104, 0.7)
+  if (!DUST) buildDust()
+  const { cv, src, x0, y0, cw, ch } = DUST
+  // parte da tela ainda inteira (a frente de desintegração corre da esquerda para a direita)
+  const front = x0 + ((u - 0.6) / 1.2) * cw
+  if (front < x0 + cw) {
+    c.save(); c.beginPath(); c.rect(Math.max(x0, front), y0 - 10, cw + 20, ch + 20); c.clip()
+    c.shadowColor = 'rgba(226,64,143,.35)'; c.shadowBlur = 60; c.drawImage(cv, x0, y0); c.restore()
+  }
+  for (const p of src) {
+    if (u < p.rel) continue
+    const k1 = eOut(seg(u, p.rel, 1.1)), k2 = eQIO(seg(u, p.back, 1.5))
+    const sw = Math.sin((u - p.rel) * 3 + p.y * 0.01) * 40 * (1 - k2)
+    const ax = lerp(p.x, p.mx, k1), ay = lerp(p.y, p.my, k1) + sw
+    const x = lerp(ax, p.ex, k2), y = lerp(ay, p.ey, k2)
+    const fr = p.mag ? [226, 64, 143] : [239, 235, 228]
+    c.fillStyle = `rgb(${Math.round(lerp(p.r, fr[0], k2))},${Math.round(lerp(p.g, fr[1], k2))},${Math.round(lerp(p.b, fr[2], k2))})`
+    const s = lerp(6, 4.6, k2); c.fillRect(x - s / 2, y - s / 2, s, s)
+  }
+  const tk = seg(u, 4.3, 0.6)
+  if (tk > 0) { T('SITES  ·  SISTEMAS  ·  AUTOMAÇÃO & IA', CX, 1160, `400 26px ${M}`, IVORY, { a: 'center', ls: 4, al: tk * 0.8 }); star(CX, 640, 30 * eBack(tk, 2.2), MAG, u) }
+}
+
 /* ---------------- montagem ---------------- */
-const SCENES = [[0, sHook], [8, sBrand], [16, sScan], [22, sBuild], [30, sLive], [36, sMani], [40, sEnd]]
-const TOTAL = b2t(47)
+// [início na linha do tempo, cena, início original da cena] — cada cena recebe o beat no seu próprio relógio
+const SCENES = [[0, sHook, 0], [7, sMorph, 7], [14, sBrand, 8], [22, sScan, 16], [28, sBuild, 22], [36, sLive, 30], [42, sMani, 36], [46, sDust, 46], [52, sEnd, 40]]
+const TOTAL = b2t(59)
 function drawAt(t) {
   const b = t / BEAT
   let idx = 0; SCENES.forEach(([s], i) => { if (b >= s) idx = i })
-  const [s0, fn] = SCENES[idx], u = b - s0
+  const [s0, fn, o0] = SCENES[idx], u = b - s0
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none'
   // "punch" de câmera em cada corte
   const p = 1 + 0.035 * (1 - eOut(seg(u, 0, 0.6)))
   c.translate(CX, 960); c.scale(p, p); c.translate(-CX, -960)
-  fn(b)
+  fn(u + o0)
 }
 const grain = [...Array(4)].map((_, n) => { const g = document.createElement('canvas'); g.width = g.height = 256; const x = g.getContext('2d'), id = x.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const v = rnd(i * 0.37 + n * 991.3) * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255 } x.putImageData(id, 0, 0); return g })
 

@@ -67,16 +67,16 @@ function path(pts, b) {
    1 · GANCHO (beats 0–8): "SUA AGENDA AINDA VIVE NO PAPEL?"
    ========================================================= */
 const HOOK = [
-  { t: 'SUA', at: 0, y: 700, s: 110, w: 500 },
-  { t: 'AGENDA', at: 0.5, y: 900, s: 230, w: 700 },
-  { t: 'AINDA', at: 1.5, y: 1030, s: 110, w: 500, x: 70 },
-  { t: 'VIVE NO', at: 2, y: 1030, s: 110, w: 500, x: 1010, a: 'right' },
-  { t: 'PAPEL?', at: 3, y: 1290, s: 270, w: 700, col: MAG },
+  { t: 'SUA', at: 0.1, y: 700, s: 110, w: 500 },
+  { t: 'AGENDA', at: 0.9, y: 900, s: 230, w: 700 },
+  { t: 'AINDA', at: 3.1, y: 1030, s: 110, w: 500, x: 70 },
+  { t: 'VIVE NO', at: 3.6, y: 1030, s: 110, w: 500, x: 1010, a: 'right' },
+  { t: 'PAPEL?', at: 4.6, y: 1290, s: 270, w: 700, col: MAG },
 ]
 function sHook(b) {
   fill(INK); grid(IVORY, 0.05)
   meta(IVORY, '(00) O PROBLEMA', 'ASTROVIA', 104, seg(b, 0, 0.5) * 0.7)
-  const gl = b > 4.5 ? Math.max(0, Math.sin((b - 4.5) * Math.PI * 2)) * (b < 7 ? 1 : 0) : 0
+  const gl = b > 5.4 ? Math.max(0, Math.sin((b - 5.4) * Math.PI * 2.5)) * (b < 7 ? 1 : 0) : 0
   const drawWords = (dx, col) => HOOK.forEach((w, i) => {
     const k = seg(b, w.at, 0.45); if (k <= 0) return
     const f = `${w.w} ${w.s}px ${G}`, x = w.x ?? CX, a = w.a || (w.x ? 'left' : 'center')
@@ -92,7 +92,7 @@ function sHook(b) {
   } else drawWords(0)
   // barras magenta disparando nos beats
   for (let i = 0; i < 9; i++) {
-    const at = 4.5 + i * 0.28, k = seg(b, at, 0.35); if (k <= 0 || k >= 1) continue
+    const at = 5.2 + i * 0.2, k = seg(b, at, 0.35); if (k <= 0 || k >= 1) continue
     const y = 520 + rnd(i * 7) * 900, w = 140 + rnd(i * 3) * 380, dir = i % 2 ? 1 : -1
     const x = dir > 0 ? lerp(-w, W, eOut(k)) : lerp(W, -w, eOut(k))
     c.fillStyle = i % 3 ? MAG : IVORY; c.fillRect(x, y, w, 26 + rnd(i) * 30)
@@ -450,18 +450,55 @@ function sDust(b) {
 }
 
 /* ---------------- montagem ---------------- */
-// [início na linha do tempo, cena, início original da cena] — cada cena recebe o beat no seu próprio relógio
-const SCENES = [[0, sHook, 0], [7, sMorph, 7], [14, sBrand, 8], [22, sScan, 16], [28, sBuild, 22], [36, sLive, 30], [42, sMani, 36], [46, sDust, 46], [52, sEnd, 40]]
-const TOTAL = b2t(59)
+// Linha do tempo guiada pela narração (segundos da voz): [início, fim, cena, beat de origem, duração original em beats]
+// Cada cena é esticada/comprimida para caber exatamente no trecho falado correspondente.
+const SCENES = [
+  [0.0, 3.0, sHook, 0, 7],      // "Sua agenda… ainda vive no papel?"
+  [3.0, 5.9, sMorph, 7, 7],     // "E se ela virasse… um sistema?"
+  [5.9, 10.4, sBrand, 8, 8],    // "Na Astrovia, a gente cria sites e sistemas… com gesto próprio."
+  [10.4, 14.7, sBuild, 22, 8],  // "Do clique… à confirmação. Seu cliente agenda sozinho."
+  [14.7, 17.7, sLive, 30, 6],   // "Enquanto você atende… o sistema trabalha."
+  [17.7, 19.4, sMani, 36, 4],   // "Feito sob medida."
+  [19.4, 22.4, sDust, 46, 6],   // "Pra quem não aceita o comum. Astrovia."
+  [22.4, 25.2, sEnd, 40, 6],    // "Conheça nosso trabalho."
+]
+const TOTAL = 25.2
+const CAPS = [
+  [3.13, 5.4, 'E se ela virasse… um sistema?'],
+  [5.97, 8.05, 'Na Astrovia, a gente cria', 1480],
+  [8.05, 10.21, 'sites e sistemas… com gesto próprio.', 1480],
+  [10.54, 12.44, 'Do clique… à confirmação.'],
+  [12.8, 14.56, 'Seu cliente agenda sozinho.'],
+  [19.53, 20.94, 'Pra quem não aceita o comum.'],
+]
+// legenda com destaque palavra a palavra (karaokê)
+function caption(t) {
+  const cap = CAPS.find(([a, b]) => t >= a - 0.15 && t <= b + 0.25); if (!cap) return
+  const [a, b, txt, cy] = cap, words = txt.split(' '), f = `500 40px ${G}`
+  const k = eOut(seg(t, a - 0.15, 0.25)) * (1 - seg(t, b + 0.05, 0.2))
+  const total = tw(txt, f), padX = 34, w = total + padX * 2, x0 = CX - w / 2, y = cy || 1560
+  c.save(); c.globalAlpha = k; c.translate(0, (1 - k) * 16)
+  c.fillStyle = 'rgba(11,10,13,.82)'; rr(x0, y - 52, w, 76, 38); c.fill()
+  let x = x0 + padX; const chars = txt.length
+  let acc = 0
+  words.forEach((wd) => {
+    const st = a + ((b - a) * acc) / chars; acc += wd.length + 1
+    const on = t >= st
+    T(wd, x, y, f, on ? '#fff' : 'rgba(255,255,255,.38)'); if (on && t < st + 0.25) { c.fillStyle = MAG; c.fillRect(x, y + 10, tw(wd, f), 3) }
+    x += tw(wd + ' ', f)
+  })
+  c.restore()
+}
 function drawAt(t) {
-  const b = t / BEAT
-  let idx = 0; SCENES.forEach(([s], i) => { if (b >= s) idx = i })
-  const [s0, fn, o0] = SCENES[idx], u = b - s0
+  let idx = 0; SCENES.forEach(([s], i) => { if (t >= s) idx = i })
+  const [s0, s1, fn, o0, ob] = SCENES[idx], stretch = (s1 - s0) / (ob * BEAT), u = (t - s0) / stretch / BEAT
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none'
   // "punch" de câmera em cada corte
   const p = 1 + 0.035 * (1 - eOut(seg(u, 0, 0.6)))
   c.translate(CX, 960); c.scale(p, p); c.translate(-CX, -960)
   fn(u + o0)
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1
+  caption(t)
 }
 const grain = [...Array(4)].map((_, n) => { const g = document.createElement('canvas'); g.width = g.height = 256; const x = g.getContext('2d'), id = x.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const v = rnd(i * 0.37 + n * 991.3) * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255 } x.putImageData(id, 0, 0); return g })
 

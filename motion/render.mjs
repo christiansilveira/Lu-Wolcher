@@ -7,12 +7,12 @@ import { fileURLToPath } from 'node:url'
 
 const dir = path.dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2)
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--allow-file-access-from-files'] })
 const pg = await b.newPage({ viewport: { width: 1080, height: 1920 } })
 pg.on('pageerror', (e) => console.error('PAGEERR', e.message))
-await pg.goto('file://' + dir + '/index.html')
+await pg.goto(process.env.URL || 'http://127.0.0.1:8765/index.html')
 await pg.evaluate(() => window.ready)
-const grab = (t, type) => pg.evaluate(([t, type]) => { window.render(t); return document.getElementById('c').toDataURL(type, 0.95).split(',')[1] }, [t, type])
+const grab = (t, type) => pg.evaluate(([t, type]) => { window.render(t); return document.getElementById('out').toDataURL(type, 0.95).split(',')[1] }, [t, type])
 
 if (args[0] === '--frames') {
   const { writeFileSync } = await import('node:fs')

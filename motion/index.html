@@ -6,6 +6,11 @@
 @font-face{font-family:"Space Grotesk";font-weight:700;src:url(fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
 @font-face{font-family:"Space Mono";font-weight:400;src:url(fonts/space-mono-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Space Mono";font-weight:700;src:url(fonts/space-mono-latin-700-normal.woff2) format("woff2")}
-*{margin:0;padding:0}html,body{width:1080px;height:1920px;background:#050308;overflow:hidden}canvas{display:block;width:1080px;height:1920px}
+*{margin:0;padding:0}html,body{width:1080px;height:1920px;background:#050308;overflow:hidden}
+canvas{display:block;width:1080px;height:1920px;position:absolute;left:0;top:0}#gl,#ov{visibility:hidden}
 </style>
-</head><body><canvas id="c" width="1080" height="1920"></canvas><script src="motion.js"></script></body></html>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head><body>
+<canvas id="gl" width="1080" height="1920"></canvas><canvas id="ov" width="1080" height="1920"></canvas><canvas id="out" width="1080" height="1920"></canvas>
+<script type="module" src="main.js"></script>
+</body></html>

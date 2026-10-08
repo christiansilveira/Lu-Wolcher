@@ -24,6 +24,8 @@ export function StoreProvider({ children }) {
     try { setPub(await db.loadPublic()) } catch (e) { setError(e.message) }
   }, [])
 
+  const dataRef = useRef(data)
+  useEffect(() => { dataRef.current = data }, [data])
   const sessionRef = useRef(session)
   useEffect(() => { sessionRef.current = session }, [session])
   // Sincronização econômica: carga completa só ao entrar (ou após 30 min fora);
@@ -71,7 +73,24 @@ export function StoreProvider({ children }) {
       await run(() => db.adjustSale(id, a, payment), 'Venda ajustada')
       setData((d) => d && { ...d, sales: d.sales.map((x) => (x.id === id ? { ...x, ...a, payment: payment || x.payment } : x)), appointments: d.appointments.map((x) => (x.saleId === id || x.id === d.sales.find((y) => y.id === id)?.appointmentId ? { ...x, total: a.total } : x)) })
     },
-    deleteSale: async (id) => { await run(() => db.deleteSale(id), 'Venda estornada'); setData((d) => d && { ...d, sales: d.sales.filter((x) => x.id !== id) }) },
+    deleteSale: async (id) => {
+      const d0 = dataRef.current
+      const sale = d0?.sales.find((x) => x.id === id)
+      const client = sale?.clientId && d0.clients.find((x) => x.id === sale.clientId)
+      await run(() => db.deleteSale(id), 'Venda estornada')
+      setData((d) => d && { ...d, sales: d.sales.filter((x) => x.id !== id) })
+      // devolve o saldo usado / tira o fiado / desfaz o crédito comprado nessa venda
+      const back = sale ? saleCreditEffect(sale) : 0
+      if (client && back) {
+        const { id: cid, name, phone, notes, anamnese, createdAt, birthday, lastCampaignAt } = client
+        const credit = Math.round((Number(client.credit || 0) + back) * 100) / 100
+        await run(() => db.upsert('clients', { id: cid, name, phone, notes, anamnese, createdAt, birthday, lastCampaignAt, credit }))
+      }
+    },
+    deleteClient: async (id) => {
+      await run(() => db.deleteClient(id), 'Cliente excluída', 'full')
+      setData((d) => d && { ...d, clients: d.clients.filter((x) => x.id !== id) })
+    },
     resetDemo: async () => { db.reset(); await refresh('full'); await loadPublic(); notify('Dados de demonstração restaurados') },
     reload: () => refresh('poll'),
     /** volta ao painel: completo se ficou mais de 30 min fora */
@@ -102,3 +121,13 @@ export function StoreProvider({ children }) {
 }
 
 export const useStore = () => useContext(Ctx)
+
+/** Quanto o saldo da cliente muda ao estornar a venda: saldo usado e fiado voltam, crédito comprado sai */
+export function saleCreditEffect(sale) {
+  const credItems = (sale.items || []).filter((i) => i.type === 'credit').reduce((a, i) => a + Number(i.price || 0) * Number(i.qty || 1), 0)
+  const pay = String(sale.payment || '')
+  let back = 0
+  if (pay.trim() === 'saldo') back = Number(sale.total || 0)
+  else for (const m of pay.matchAll(/(saldo|a pagar)\s+R\$\s*([\d.]+,\d{2})/g)) back += Number(m[2].replace(/\./g, '').replace(',', '.'))
+  return Math.round((back - credItems) * 100) / 100
+}

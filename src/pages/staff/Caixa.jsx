@@ -83,7 +83,7 @@ function CaixaInner() {
                     <span className="appt-info"><b>{s.clientName}</b><small>{s.items.map((i) => `${i.qty > 1 ? i.qty + 'x ' : ''}${i.name}`).join(', ')} · {b?.name.split(' ')[0]} · {PAYMENTS[s.payment]}</small></span>
                     <b>{money(s.total)}</b>
                     {isAdmin && <button className="icon-btn sm" title="Ajustar valor ou desconto" onClick={() => setAdj({ s, final: String(s.total).replace('.', ','), payment: s.payment })}><Pencil size={15} /></button>}
-                    {isAdmin && <button className="icon-btn sm" title="Estornar venda" onClick={async () => (await actions.confirm(`Estornar a venda de ${money(s.total)} para ${s.clientName}? O estoque volta e a comissão é removida.`, 'Estornar')) && actions.deleteSale(s.id)}><RotateCcw size={15} /></button>}
+                    {isAdmin && <button className="icon-btn sm" title="Estornar venda" onClick={async () => (await actions.confirm(`Estornar a venda de ${money(s.total)} para ${s.clientName}? O estoque volta, a comissão é removida e o saldo/fiado da cliente é desfeito.`, 'Estornar')) && actions.deleteSale(s.id)}><RotateCcw size={15} /></button>}
                   </div>
                 )
               })}

@@ -152,6 +152,11 @@ export function createSupabaseDB(url, key) {
 
     async adjustSale(id, a, payment) { must(await sb.rpc('adjust_sale', { p_id: id, p_items: a.items, p_discount: a.discount, p_total: a.total, p_commission_total: a.commissionTotal, p_payment: payment })) },
     async deleteSale(id) { must(await sb.rpc('delete_sale', { p_id: id })) },
+    async deleteClient(id) {
+      const { error } = await sb.rpc('delete_client', { p_id: id })
+      if (error && /delete_client/.test(error.message || '')) throw new Error('Rode o arquivo supabase/EXCLUIR-CLIENTE.sql no Supabase para liberar a exclusão de clientes')
+      if (error) throw new Error(error.message)
+    },
 
     // ---- Portal do cliente ----
     async portal(phone) {

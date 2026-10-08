@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, FileText, Users } from 'lucide-react'
+import { Download, FileText, Trash2, Users } from 'lucide-react'
 import { useStore } from '../../state/Store'
 import { BarChart, Button, Card, RankRow, Segmented, Stat } from '../../components/ui'
 import { commissionSummary } from '../../lib/commission'
@@ -17,7 +17,7 @@ export function periodOf(key, custom) {
 }
 
 export default function Relatorios() {
-  const { data, actions } = useStore()
+  const { data, actions, session } = useStore()
   const [devSel, setDevSel] = useState(null)
   const [recv, setRecv] = useState('')
   const [period, setPeriod] = useState('mes')
@@ -114,6 +114,7 @@ export default function Relatorios() {
                   <input inputMode="decimal" value={recv} onChange={(e) => setRecv(e.target.value)} placeholder="Valor recebido" style={{ maxWidth: 160 }} />
                   <Button size="sm" onClick={async () => { const v = Math.min(Number(String(recv).replace(/\./g, '').replace(',', '.')) || 0, Math.abs(c.credit)); if (!v) return; const { id, name, phone, notes, anamnese, createdAt, birthday, lastCampaignAt } = c; await actions.upsert('clients', { id, name, phone, notes, anamnese, createdAt, birthday, lastCampaignAt, credit: Math.round((Number(c.credit) + v) * 100) / 100 }, `Recebido ${money(v)}`); setRecv('') }}>Abater</Button>
                   <Button size="sm" variant="ghost" onClick={async () => { const { id, name, phone, notes, anamnese, createdAt, birthday, lastCampaignAt } = c; await actions.upsert('clients', { id, name, phone, notes, anamnese, createdAt, birthday, lastCampaignAt, credit: 0 }, 'Dívida quitada') }}>Quitar tudo</Button>
+                  {session?.role === 'admin' && <Button size="sm" variant="danger" icon={Trash2} onClick={async () => { if (await actions.confirm(`Excluir ${c.name} do sistema? A dívida de ${money(Math.abs(c.credit))} e os horários marcados dela serão apagados. As vendas antigas continuam nos relatórios. Essa ação não pode ser desfeita.`, 'Excluir cliente')) { await actions.deleteClient(c.id); setDevSel(null) } }}>Excluir cliente</Button>}
                 </div>
               </div>}
             </div>)}

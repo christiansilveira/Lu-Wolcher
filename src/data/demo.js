@@ -163,6 +163,16 @@ export function createDemoDB() {
       data.sales = data.sales.filter((x) => x.id !== id); save()
     },
 
+    async deleteClient(id) {
+      const open = (a) => a.clientId === id && !a.saleId && ['agendado', 'confirmado', 'cancelado'].includes(a.status)
+      data.appointments = data.appointments.filter((a) => !open(a))
+      data.appointments.forEach((a) => { if (a.clientId === id) a.clientId = null })
+      data.sales.forEach((s) => { if (s.clientId === id) s.clientId = null })
+      data.photos.forEach((p) => { if (p.clientId === id) p.clientId = null })
+      data.subscriptions = data.subscriptions.filter((s) => s.clientId !== id)
+      data.clients = data.clients.filter((c) => c.id !== id); save()
+    },
+
     // ---- Portal do cliente (Meus horários) ----
     async portal(phone) {
       const c = data.clients.find((x) => onlyDigits(x.phone) === onlyDigits(phone))

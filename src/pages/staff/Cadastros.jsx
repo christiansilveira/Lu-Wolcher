@@ -119,7 +119,10 @@ export function ClientModal({ c: raw, onClose, restricted = false }) {
   const back = fillMsg(data.settings, 'callClient', { nome: c.name.split(' ')[0], link: bookingLink() })
 
   return (
-    <Modal open onClose={onClose} title={c.name} footer={<Button block onClick={saveClient}>Salvar</Button>}>
+    <Modal open onClose={onClose} title={c.name} footer={<div className="foot-row">
+      {!restricted && session?.role === 'admin' && <Button variant="danger" icon={Trash2} onClick={async () => { if (await actions.confirm(`Excluir ${c.name} do sistema?${Number(c.credit || 0) < 0 ? ` A dívida de ${money(Math.abs(c.credit))} será apagada.` : ''} Os horários marcados dela também serão apagados; as vendas antigas continuam nos relatórios. Essa ação não pode ser desfeita.`, 'Excluir cliente')) { await actions.deleteClient(c.id); onClose() } }}>Excluir</Button>}
+      <Button block onClick={saveClient}>Salvar</Button>
+    </div>}>
       <div className="mini-kpis row">
         <div><b>{c.visits}</b> visitas</div><div><b>{money(c.spent)}</b> gasto</div><div><b>{c.noShows}</b> faltas</div>
       </div>

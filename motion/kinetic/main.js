@@ -498,7 +498,7 @@ function drawAt(t) {
   c.translate(CX, 960); c.scale(p, p); c.translate(-CX, -960)
   fn(u + o0)
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1
-  caption(t)
+  // caption(t) — legendas desativadas (a narração + tipografia já carregam a mensagem)
 }
 const grain = [...Array(4)].map((_, n) => { const g = document.createElement('canvas'); g.width = g.height = 256; const x = g.getContext('2d'), id = x.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const v = rnd(i * 0.37 + n * 991.3) * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255 } x.putImageData(id, 0, 0); return g })
 

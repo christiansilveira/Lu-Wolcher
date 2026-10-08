@@ -70,7 +70,7 @@ function s1(u) {
   c.save(); c.shadowColor = OR; c.shadowBlur = 40; c.fillStyle = OR; c.beginPath(); c.arc(CX, 640, 11 * pk, 0, 7); c.fill(); c.restore()
   c.strokeStyle = `rgba(255,90,31,${(1 - fr) * 0.7 * (1 - seg(u, 1.3, 0.2))})`; c.lineWidth = 2; c.beginPath(); c.arc(CX, 640, 12 + fr * 130, 0, 7); c.stroke()
   // perguntas datilografadas e riscadas
-  const L = ['agenda no caderno?', 'comanda no papel?', 'comissão na calculadora?'], f = `500 52px ${MONO}`
+  const L = ['agenda no caderno?', 'comanda no papel?', 'comissão na calculadora?'], f = `500 58px ${MONO}`
   const x0 = CX - tw(L[2], f) / 2
   L.forEach((s, i) => {
     const st = 0.2 + i * 0.36, n = Math.floor(clamp((u - st) / 0.28) * s.length), y = 860 + i * 104
@@ -96,7 +96,7 @@ function s2(u) {
   const z = Math.pow(90, eIn(seg(u, 1.15, 0.5)))
   c.save(); c.translate(dx, dy); c.scale(z, z); c.translate(-dx, -dy)
   c.fillStyle = 'rgba(10,11,16,.07)'; for (let x = 0; x <= W; x += 135) c.fillRect(x, 0, 2, H)
-  T('PARA SALÕES, CLÍNICAS E BARBEARIAS', CX, 760, { f: `600 24px ${MONO}`, c: INK, a: 'center', ls: 4, al: seg(u, 0.25, 0.3) })
+  T('PARA SALÕES, CLÍNICAS E BARBEARIAS', CX, 760, { f: `600 30px ${MONO}`, c: INK, a: 'center', ls: 2, al: seg(u, 0.25, 0.3) })
   for (let i = 0; i < word.length; i++) {
     const k = seg(u, 0.02 + i * 0.05, 0.42); if (k <= 0) continue
     const yy = by - (1 - eBack(k)) * 700
@@ -132,10 +132,10 @@ function s3(u) {
   c.beginPath(); c.ellipse(0, 0, 500 * ok, 120 * ok, 0, 0, 7); c.stroke()
   const a = u * 2.4; c.shadowColor = OR; c.shadowBlur = 30; c.fillStyle = OR; c.globalAlpha = ok
   c.beginPath(); c.arc(Math.cos(a) * 500 * ok, Math.sin(a) * 120 * ok, 12, 0, 7); c.fill(); c.restore()
-  T('APRESENTANDO', CX, 380, { f: `600 22px ${MONO}`, c: WHITE, a: 'center', ls: 8, al: seg(u, 0.1, 0.3) * 0.7 })
+  T('APRESENTANDO', CX, 380, { f: `600 30px ${MONO}`, c: WHITE, a: 'center', ls: 8, al: seg(u, 0.1, 0.3) * 0.7 })
   riseChars('ASTROVIA', 590, `900 156px ${DISP}`, 156, WHITE, u, 0.2, 0.045, -4)
-  rise(seg(u, 0.75, 0.6), 680, 64, () => T('gestão que trabalha por você', CX, 680, { f: `italic 400 64px ${SERIF}`, c: OR, a: 'center' }))
-  T('AGENDA  ·  CAIXA  ·  COMISSÕES  ·  CLIENTES  ·  RELATÓRIOS', CX, 1600, { f: `500 19px ${MONO}`, c: WHITE, a: 'center', ls: 2, al: seg(u, 1.0, 0.4) * 0.6 })
+  rise(seg(u, 0.75, 0.6), 690, 70, () => T('gestão que trabalha por você', CX, 690, { f: `italic 400 60px ${SERIF}`, c: OR, a: 'center' }))
+  T('AGENDA  ·  CAIXA  ·  COMISSÕES  ·  CLIENTES  ·  RELATÓRIOS', CX, 1600, { f: `500 25px ${MONO}`, c: WHITE, a: 'center', ls: 1, al: seg(u, 1.0, 0.4) * 0.75 })
 }
 
 /* ---------- 01 · agenda ---------- */
@@ -154,8 +154,8 @@ const BLOCKS = [
 function s4(u) {
   const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2E4CFF'); g.addColorStop(1, '#152BC9'); c.fillStyle = g; c.fillRect(-W, -H, W * 3, H * 3)
   ;[[160, 420, 600], [960, 1500, 760]].forEach(([x, y, r]) => { const q = c.createRadialGradient(x, y, 10, x, y, r); q.addColorStop(0, 'rgba(255,255,255,.16)'); q.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = q; c.fillRect(0, 0, W, H) })
-  T('AGENDA INTELIGENTE', 90, 250, { f: `600 22px ${MONO}`, c: WHITE, ls: 5, al: seg(u, 0, 0.3) * 0.75 })
-  rise(seg(u, 0.05, 0.5), 375, 108, () => T('Sua agenda,', 86, 375, { f: `900 108px ${DISP}`, c: WHITE, ls: -3 }))
+  T('AGENDA INTELIGENTE', 90, 250, { f: `600 28px ${MONO}`, c: WHITE, ls: 5, al: seg(u, 0, 0.3) * 0.85 })
+  rise(seg(u, 0.05, 0.5), 375, 108, () => T('Sua agenda,', 82, 375, { f: `900 122px ${DISP}`, c: WHITE, ls: -3 }))
   rise(seg(u, 0.17, 0.5), 470, 86, () => T('organizada sozinha.', 90, 470, { f: `italic 400 86px ${SERIF}`, c: WHITE }))
   // cartões de fundo
   const pk = seg(u, 0.22, 0.6), sc = lerp(0.9, 1, eBack(pk)), oy = (1 - eOut(pk)) * 160
@@ -173,7 +173,7 @@ function s4(u) {
   })
   for (let h = 0; h < 8; h++) {
     const y = y0 + h * rowH; c.fillStyle = '#EEF0F4'; c.fillRect(190, y, 790, 2)
-    T(`${9 + h}:00`, 112, y + 8, { f: `500 19px ${MONO}`, c: MUTED })
+    T(`${9 + h}:00`, 104, y + 8, { f: `500 22px ${MONO}`, c: MUTED })
   }
   BLOCKS.forEach(([col, st, dur, title, cli, status], b) => {
     const isNew = status === 'new'
@@ -186,7 +186,7 @@ function s4(u) {
     c.fillStyle = bgc; rr(0, 0, w, h, 14); c.fill(); c.shadowBlur = 0
     if (isNew) { c.strokeStyle = OR; c.lineWidth = 3; rr(0, 0, w, h, 14); c.stroke() }
     c.fillStyle = bar; rr(0, 0, 7, h, [14, 0, 0, 14]); c.fill()
-    T(title, 20, 31, { f: `700 21px ${SANS}`, c: INK }); T(cli, 20, 56, { f: `500 18px ${SANS}`, c: '#5E6170' })
+    T(title, 18, 32, { f: `700 22px ${SANS}`, c: INK, ls: -0.6 }); T(cli, 18, 58, { f: `500 20px ${SANS}`, c: '#5E6170' })
     c.fillStyle = bar; c.beginPath(); c.arc(w - 18, 22, 6, 0, 7); c.fill()
     if (status === 'flip' && u > 1.85) { const p = (u * 1.6) % 1; c.strokeStyle = `rgba(255,90,31,${1 - p})`; c.lineWidth = 2; c.beginPath(); c.arc(w - 18, 22, 6 + p * 14, 0, 7); c.stroke() }
     c.restore()
@@ -202,8 +202,8 @@ function s4(u) {
     c.fillStyle = INK; rr(150, ty - 50, 780, 104, 52); c.fill(); c.shadowColor = 'transparent'
     c.fillStyle = OR; c.beginPath(); c.arc(214, ty + 2, 12, 0, 7); c.fill()
     c.strokeStyle = `rgba(255,90,31,${1 - pr})`; c.lineWidth = 2; c.beginPath(); c.arc(214, ty + 2, 12 + pr * 16, 0, 7); c.stroke()
-    T('Novo agendamento pelo site', 252, ty - 6, { f: `700 28px ${SANS}`, c: WHITE })
-    T('Carla M.  ·  Limpeza de Pele  ·  15:00', 252, ty + 30, { f: `500 22px ${SANS}`, c: WHITE, al: 0.6 })
+    T('Novo agendamento pelo site', 252, ty - 6, { f: `700 31px ${SANS}`, c: WHITE })
+    T('Carla M.  ·  Limpeza de Pele  ·  15:00', 252, ty + 32, { f: `500 25px ${SANS}`, c: WHITE, al: 0.7 })
     T('agora', 890, ty - 6, { f: `500 20px ${MONO}`, c: WHITE, a: 'right', al: 0.5 })
     c.restore()
   }
@@ -213,7 +213,7 @@ function s4(u) {
 function s5(u) {
   bg(PAPER)
   c.fillStyle = 'rgba(10,11,16,.05)'; for (let y = 0; y < H; y += 64) c.fillRect(0, y, W, 1)
-  T('CAIXA + COMISSÃO AUTOMÁTICA', 90, 250, { f: `600 22px ${MONO}`, c: INK, ls: 5, al: seg(u, 0, 0.3) * 0.6 })
+  T('CAIXA + COMISSÃO AUTOMÁTICA', 90, 250, { f: `600 28px ${MONO}`, c: INK, ls: 4, al: seg(u, 0, 0.3) * 0.75 })
   rise(seg(u, 0.05, 0.5), 375, 104, () => T('Fechou a comanda?', 86, 375, { f: `900 94px ${DISP}`, c: INK, ls: -3 }))
   rise(seg(u, 0.17, 0.5), 465, 80, () => T('a comissão já está pronta.', 90, 465, { f: `italic 400 64px ${SERIF}`, c: OR }))
   const pk = seg(u, 0.15, 0.5), shake = u > 1.6 && u < 1.8 ? Math.sin(u * 90) * 7 * (1 - seg(u, 1.6, 0.2)) : 0
@@ -223,15 +223,15 @@ function s5(u) {
   c.beginPath(); c.moveTo(X + 24, Y); c.arcTo(X + Wd, Y, X + Wd, Y + Hd, 24); c.lineTo(X + Wd, Y + Hd)
   for (let x = X + Wd; x > X; x -= 30) { c.lineTo(x - 15, Y + Hd + 16); c.lineTo(x - 30, Y + Hd) }
   c.arcTo(X, Y, X + Wd, Y, 24); c.closePath(); c.fill(); c.restore()
-  T('COMANDA #0428', 190, 628, { f: `600 21px ${MONO}`, c: MUTED, ls: 2 }); T('14/10 · 15:42', 890, 628, { f: `500 21px ${MONO}`, c: MUTED, a: 'right' })
+  T('COMANDA #0428', 190, 628, { f: `600 25px ${MONO}`, c: MUTED, ls: 2 }); T('14/10 · 15:42', 890, 628, { f: `500 25px ${MONO}`, c: MUTED, a: 'right' })
   T('Carla Mendes', 190, 690, { f: `800 46px ${SANS}`, c: INK })
   const dash = (y) => { c.save(); c.setLineDash([10, 10]); c.strokeStyle = '#D9D6CF'; c.lineWidth = 2; c.beginPath(); c.moveTo(190, y); c.lineTo(890, y); c.stroke(); c.restore() }
   dash(730)
   ;[['Limpeza de Pele Profunda', 'com Amanda', 180], ['Design de Sobrancelhas', 'com Bianca', 70], ['Sérum Vitamina C', 'produto · home care', 189]].forEach(([n, s, p], i) => {
     const k = eOut(seg(u, 0.4 + i * 0.13, 0.3)); if (k <= 0) return
     const y = 795 + i * 92; c.save(); c.globalAlpha *= k; c.translate((1 - k) * -50, 0)
-    T(n, 190, y, { f: `700 30px ${SANS}`, c: INK }); T(s, 190, y + 32, { f: `500 22px ${SANS}`, c: MUTED })
-    T(`R$ ${brl(p)}`, 890, y, { f: `700 30px ${SANS}`, c: INK, a: 'right' }); c.restore()
+    T(n, 190, y, { f: `700 33px ${SANS}`, c: INK, ls: -0.5 }); T(s, 190, y + 34, { f: `500 25px ${SANS}`, c: MUTED })
+    T(`R$ ${brl(p)}`, 890, y, { f: `700 33px ${SANS}`, c: INK, a: 'right' }); c.restore()
   })
   dash(1085)
   T('Total', 190, 1150, { f: `600 30px ${SANS}`, c: MUTED })
@@ -242,7 +242,7 @@ function s5(u) {
     c.save(); c.globalAlpha *= k; c.fillStyle = on ? INK : '#F1EFEA'; rr(x, 1200, 220, 66, 33); c.fill()
     T(m, x + 110, 1243, { f: `700 26px ${SANS}`, c: on ? '#fff' : INK, a: 'center' }); c.restore()
   })
-  T('2 profissionais  ·  1 pagamento', 190, 1330, { f: `500 21px ${MONO}`, c: MUTED, al: seg(u, 1.3, 0.3) })
+  T('2 profissionais  ·  1 pagamento', 190, 1335, { f: `500 26px ${MONO}`, c: MUTED, al: seg(u, 1.3, 0.3) })
   // carimbo
   const sk = seg(u, 1.55, 0.22)
   if (sk > 0) {
@@ -257,8 +257,8 @@ function s5(u) {
     const y = 1440 + i * 96 + (1 - eBack(k)) * 60
     c.save(); c.globalAlpha = clamp(k * 3); c.fillStyle = INK; rr(150, y, 780, 80, 40); c.fill()
     c.fillStyle = col; c.beginPath(); c.arc(194, y + 40, 20, 0, 7); c.fill(); T(n[0], 194, y + 48, { f: `800 20px ${SANS}`, c: '#fff', a: 'center' })
-    T(n, 230, y + 50, { f: `700 28px ${SANS}`, c: '#fff' }); T('comissão', 230 + tw(n + '  ', `700 28px ${SANS}`), y + 50, { f: `500 20px ${MONO}`, c: '#fff', al: 0.5 })
-    T(`+ R$ ${brl(v)}`, 900, y + 51, { f: `800 30px ${SANS}`, c: OR, a: 'right' }); c.restore()
+    T(n, 230, y + 51, { f: `700 32px ${SANS}`, c: '#fff' }); T('comissão', 230 + tw(n + '  ', `700 32px ${SANS}`), y + 50, { f: `500 24px ${MONO}`, c: '#fff', al: 0.6 })
+    T(`+ R$ ${brl(v)}`, 900, y + 52, { f: `800 34px ${SANS}`, c: OR, a: 'right' }); c.restore()
   })
 }
 
@@ -266,11 +266,11 @@ function s5(u) {
 function s6(u) {
   bg(INK)
   const q = c.createRadialGradient(950, 300, 10, 950, 300, 900); q.addColorStop(0, 'rgba(35,64,255,.35)'); q.addColorStop(1, 'rgba(10,11,16,0)'); c.fillStyle = q; c.fillRect(0, 0, W, H)
-  T('RELATÓRIOS EM TEMPO REAL', 90, 250, { f: `600 22px ${MONO}`, c: WHITE, ls: 5, al: seg(u, 0, 0.3) * 0.6 })
+  T('RELATÓRIOS EM TEMPO REAL', 90, 250, { f: `600 28px ${MONO}`, c: WHITE, ls: 5, al: seg(u, 0, 0.3) * 0.75 })
   rise(seg(u, 0.05, 0.4), 340, 40, () => T('Faturamento do mês', 90, 340, { f: `600 38px ${SANS}`, c: WHITE, al: 0.7 }))
   rise(seg(u, 0.1, 0.5), 510, 160, () => T(`R$ ${Math.round(48920 * eExpo(seg(u, 0.15, 1.2))).toLocaleString('pt-BR')}`, 82, 510, { f: `900 162px ${DISP}`, c: WHITE, ls: -6 }))
   const ck = seg(u, 0.6, 0.3)
-  if (ck > 0) { c.save(); c.globalAlpha = ck; c.fillStyle = OR; rr(90, 550, 150, 50, 25); c.fill(); T('▲ 18%', 165, 585, { f: `800 26px ${SANS}`, c: INK, a: 'center' }); T('vs. mês anterior', 262, 585, { f: `500 24px ${MONO}`, c: WHITE, al: 0.55 }); c.restore() }
+  if (ck > 0) { c.save(); c.globalAlpha = ck; c.fillStyle = OR; rr(90, 550, 150, 50, 25); c.fill(); T('▲ 18%', 165, 585, { f: `800 26px ${SANS}`, c: INK, a: 'center' }); T('vs. mês anterior', 262, 585, { f: `500 28px ${MONO}`, c: WHITE, al: 0.7 }); c.restore() }
   const panel = (x, y, w, h, k) => { c.globalAlpha = clamp(k * 2); c.fillStyle = '#14161F'; rr(x, y + (1 - eOut(k)) * 80, w, h, 32); c.fill(); c.globalAlpha = 1; return (1 - eOut(k)) * 80 }
   // anel
   let o = panel(70, 660, 430, 540, seg(u, 0.25, 0.5))
@@ -279,11 +279,11 @@ function s6(u) {
   if (rk > 0) { c.save(); c.shadowColor = OR; c.shadowBlur = 30; c.strokeStyle = OR; c.beginPath(); c.arc(285, 900 + o, 135, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * 0.78 * rk); c.stroke(); c.restore() }
   c.lineCap = 'butt'
   T(`${pct}%`, 285, 925 + o, { f: `900 76px ${DISP}`, c: WHITE, a: 'center', ls: -2 })
-  T('clientes que voltaram', 285, 1110 + o, { f: `italic 400 32px ${SERIF}`, c: WHITE, a: 'center', al: 0.85 })
-  T('TAXA DE RETORNO', 285, 1152 + o, { f: `500 19px ${MONO}`, c: WHITE, a: 'center', ls: 3, al: 0.5 })
+  T('clientes que voltaram', 285, 1105 + o, { f: `italic 400 38px ${SERIF}`, c: WHITE, a: 'center', al: 0.85 })
+  T('TAXA DE RETORNO', 285, 1155 + o, { f: `500 24px ${MONO}`, c: WHITE, a: 'center', ls: 3, al: 0.65 })
   // barras
   o = panel(520, 660, 490, 540, seg(u, 0.35, 0.5))
-  T('Atendimentos / semana', 556, 722 + o, { f: `600 24px ${SANS}`, c: WHITE, al: 0.7 })
+  T('Atendimentos / semana', 552, 724 + o, { f: `600 29px ${SANS}`, c: WHITE, al: 0.7 })
   const vals = [0.42, 0.55, 0.48, 0.66, 0.6, 0.74, 0.69, 0.94]
   vals.forEach((v, i) => {
     const k = eOut(seg(u, 0.55 + i * 0.06, 0.5)), bh = v * 340 * k, x = 560 + i * 55
@@ -294,7 +294,7 @@ function s6(u) {
   if (tk > 0) { const y = 1150 - 0.94 * 340 - 64 + (1 - eOut(tk)) * 20; c.save(); c.globalAlpha = tk; c.fillStyle = WHITE; rr(905, y, 92, 48, 24); c.fill(); T('126', 951, y + 33, { f: `800 24px ${SANS}`, c: INK, a: 'center' }); c.restore() }
   // linha
   o = panel(70, 1220, 940, 320, seg(u, 0.45, 0.5))
-  T('Agendamentos online · 30 dias', 110, 1282 + o, { f: `600 24px ${SANS}`, c: WHITE, al: 0.7 })
+  T('Agendamentos online · 30 dias', 110, 1284 + o, { f: `600 29px ${SANS}`, c: WHITE, al: 0.7 })
   const P = []; for (let i = 0; i < 30; i++) P.push([110 + i * (860 / 29), 1500 + o - (40 + i * 4.2 + 30 * Math.sin(i * 0.9) + 18 * Math.sin(i * 2.3))])
   const lk = eIO(seg(u, 0.7, 1.1)) * 29, n = Math.floor(lk), fr = lk - n
   if (lk > 0) {
@@ -338,7 +338,7 @@ function s7(u) {
   parts.forEach((p, k) => T(p, CX, y0 + k * lh, { f, c: style === 1 ? INK : WHITE, a: 'center', ls: -3, outline: style === 2 ? 3 : 0 }))
   if (style === 2) brackets({ x: 70, y: y0 - size - 30, w: 940, h: parts.length * lh + 70 }, 50, OR, 5)
   c.restore()
-  T(`${pad(i + 1)} / ${pad(FEATS.length)}`, CX, 1300, { f: `600 24px ${MONO}`, c: WHITE, a: 'center', ls: 4, al: 0.55 })
+  T(`${pad(i + 1)} / ${pad(FEATS.length)}`, CX, 1300, { f: `600 32px ${MONO}`, c: WHITE, a: 'center', ls: 4, al: 0.55 })
 }
 
 /* ---------- 05 · tudo junto (explosão) ---------- */
@@ -371,17 +371,17 @@ function s9(u) {
   c.save(); c.shadowColor = OR; c.shadowBlur = 50; c.fillStyle = OR; c.beginPath(); c.arc(dx, dy, 26 * dk, 0, 7); c.fill(); c.restore()
   const rv = eOut(seg(u, 0.38, 0.6))
   if (rv > 0) { c.save(); c.beginPath(); c.rect(x0 - 10, by - 200, (w + 30) * rv, 260); c.clip(); T('Astrovia', x0, by, { f, c: WHITE, ls }); c.restore() }
-  T('para salões, clínicas e barbearias', CX, 760, { f: `italic 400 50px ${SERIF}`, c: OR, a: 'center', al: seg(u, 0.9, 0.4) })
+  T('para salões, clínicas e barbearias', CX, 750, { f: `italic 400 52px ${SERIF}`, c: OR, a: 'center', al: seg(u, 0.9, 0.4) })
   const lk = eOut(seg(u, 0.8, 0.6)); c.fillStyle = 'rgba(247,245,240,.25)'; c.fillRect(CX - 440 * lk, 1040, 880 * lk, 2)
-  T('AGENDA · COMANDAS · COMISSÕES · RELATÓRIOS', CX, 1095, { f: `500 21px ${MONO}`, c: WHITE, a: 'center', ls: 3, al: seg(u, 0.95, 0.4) * 0.6 })
+  T('AGENDA · COMANDAS · COMISSÕES · RELATÓRIOS', CX, 1095, { f: `500 25px ${MONO}`, c: WHITE, a: 'center', ls: 2, al: seg(u, 0.95, 0.4) * 0.75 })
   const ck = seg(u, 1.2, 0.5)
   if (ck > 0) {
-    const cf = `800 42px ${SANS}`, label = 'Quero para minha empresa  →', cw = tw(label, cf) + 130, s = eBack(ck)
+    const cf = `800 48px ${SANS}`, label = 'Quero para minha empresa  →', cw = tw(label, cf) + 130, s = eBack(ck)
     c.save(); c.translate(CX, 1320); c.scale(s, s); c.globalAlpha = clamp(ck * 3)
-    c.shadowColor = OR; c.shadowBlur = 40 + 25 * Math.sin(u * 5); c.fillStyle = OR; rr(-cw / 2, -56, cw, 112, 56); c.fill(); c.shadowBlur = 0
-    T(label, 0, 15, { f: cf, c: INK, a: 'center' }); c.restore()
+    c.shadowColor = OR; c.shadowBlur = 40 + 25 * Math.sin(u * 5); c.fillStyle = OR; rr(-cw / 2, -64, cw, 128, 64); c.fill(); c.shadowBlur = 0
+    T(label, 0, 17, { f: cf, c: INK, a: 'center' }); c.restore()
   }
-  T('CHAME NO DIRECT', CX, 1450, { f: `600 22px ${MONO}`, c: WHITE, a: 'center', ls: 6, al: seg(u, 1.5, 0.4) * 0.6 })
+  T('CHAME NO DIRECT', CX, 1460, { f: `600 30px ${MONO}`, c: WHITE, a: 'center', ls: 6, al: seg(u, 1.5, 0.4) * 0.8 })
   // light leak
   const lp = seg(u, 2.05, 0.8), b = Math.sin(lp * Math.PI)
   if (b > 0) {
@@ -407,7 +407,7 @@ const S = [
 const TOTAL = 19.5, FPS = 60
 
 function hud(t, dark, lab) {
-  const col = dark ? '247,245,240' : '10,11,16', f = `500 19px ${MONO}`
+  const col = dark ? '247,245,240' : '10,11,16', f = `500 24px ${MONO}`
   c.save(); c.globalAlpha = seg(t, 0.15, 0.4)
   brackets({ x: 46, y: 46, w: W - 92, h: H - 92 }, 34, `rgba(${col},.5)`, 3)
   T('ASTROVIA — SISTEMA DE GESTÃO', 84, 108, { f, c: `rgba(${col},.7)`, ls: 3 })

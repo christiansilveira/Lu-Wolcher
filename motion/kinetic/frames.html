@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Astrovia — styleframes</title>
+<style>
+@font-face{font-family:"Space Grotesk";font-weight:400;src:url(../fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:500;src:url(../fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:700;src:url(../fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Mono";font-weight:400;src:url(../fonts/space-mono-latin-400-normal.woff2) format("woff2")}
+*{margin:0;padding:0}html,body{width:1080px;height:1920px;overflow:hidden;background:#000}canvas{display:block}
+</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
+<script>
+const W = 1080, H = 1920
+const INK = '#0B0A0D', IVORY = '#EFEBE4', MAG = '#E2408F', GREY = '#8D8893'
+const G = '"Space Grotesk"', M = '"Space Mono"'
+const c = document.getElementById('c').getContext('2d')
+const img = (s) => new Promise((r) => { const i = new Image(); i.onload = () => r(i); i.src = s })
+function T(s, x, y, f, col, o = {}) { c.save(); c.font = f; c.fillStyle = col; c.textAlign = o.a || 'left'; c.letterSpacing = (o.ls || 0) + 'px'; if (o.stroke) { c.strokeStyle = col; c.lineWidth = o.stroke; c.strokeText(s, x, y) } else c.fillText(s, x, y); c.restore() }
+function grid(col, a) { c.save(); c.globalAlpha = a; c.fillStyle = col; for (let i = 1; i < 6; i++) c.fillRect(Math.round(i * W / 6), 0, 1, H); c.restore() }
+function meta(col, l, r, y) { T(l, 64, y, `400 22px ${M}`, col, { ls: 1 }); T(r, W - 64, y, `400 22px ${M}`, col, { a: 'right', ls: 1 }) }
+// tela real recortada numa máscara arredondada (crop vertical em px da imagem)
+function screen(im, x, y, w, h, r, sy = 0) {
+  c.save(); c.beginPath(); c.roundRect(x, y, w, h, r); c.clip()
+  const s = w / im.width; c.drawImage(im, 0, sy, im.width, h / s, x, y, w, h); c.restore()
+}
+function star(x, y, r, col) { c.save(); c.translate(x, y); c.fillStyle = col; c.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.28 : r; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) } c.closePath(); c.fill(); c.restore() }
+
+async function frame(n) {
+  const [bk, ini, ag] = await Promise.all(['booking', 'inicio', 'agenda'].map((k) => img(`../shots/${k}-full.jpg`)))
+  if (n === 1) {
+    // ABERTURA — palavra gigante cortada pelas bordas, tela real entre as letras
+    c.fillStyle = IVORY; c.fillRect(0, 0, W, H); grid(INK, 0.08)
+    meta(INK, '(01) ASTROVIA SOLUTIONS', 'CURITIBA — BR', 104)
+    c.fillStyle = INK; c.fillRect(64, 132, W - 128, 2)
+    T('ASTRO', 40, 640, `700 370px ${G}`, INK, { ls: -26 })
+    T('VIA', W - 40, 980, `700 370px ${G}`, INK, { ls: -26, a: 'right' })
+    screen(bk, 64, 700, 330, 560, 165, 300)
+    star(560, 1150, 34, MAG)
+    T('Sites, sistemas e', 560, 1250, `500 52px ${G}`, INK, { ls: -1 })
+    T('automações com', 560, 1312, `500 52px ${G}`, INK, { ls: -1 })
+    T('gesto próprio.', 560, 1374, `500 52px ${G}`, MAG, { ls: -1 })
+    c.fillStyle = INK; c.fillRect(64, 1520, W - 128, 2)
+    ;[['SITES', '01'], ['SISTEMAS', '02'], ['AUTOMAÇÃO & IA', '03']].forEach(([s, k], i) => { const y = 1590 + i * 70; T(k, 64, y, `400 22px ${M}`, GREY); T(s, 150, y, `500 40px ${G}`, INK, { ls: -0.5 }); T('↗', W - 64, y, `400 36px ${G}`, INK, { a: 'right' }) })
+    meta(INK, 'SCROLL ↓', '©2026', 1850)
+  }
+  if (n === 2) {
+    // CASE — grid assimétrico com telas reais, número gigante vazado, letreiro
+    c.fillStyle = INK; c.fillRect(0, 0, W, H); grid(IVORY, 0.06)
+    meta(IVORY, '(02) CASE — LU WOLCHER', 'ESTÉTICA AVANÇADA', 104)
+    c.fillStyle = IVORY; c.fillRect(64, 132, W - 128, 1)
+    T('01', W + 40, 560, `700 520px ${G}`, 'rgba(239,235,228,.18)', { a: 'right', ls: -30, stroke: 2 })
+    T('Do agendamento', 64, 300, `500 82px ${G}`, IVORY, { ls: -3 })
+    T('ao caixa.', 64, 384, `500 82px ${G}`, GREY, { ls: -3 })
+    screen(bk, 64, 520, 470, 900, 44, 0)
+    screen(ag, 566, 640, 450, 560, 36, 0)
+    screen(ini, 566, 1232, 450, 420, 36, 120)
+    c.fillStyle = MAG; c.beginPath(); c.arc(522, 532, 14, 0, 7); c.fill()
+    T('Agendamento online', 64, 1480, `400 26px ${M}`, GREY, { ls: 1 }); T('24h, em 3 toques', 64, 1520, `500 40px ${G}`, IVORY, { ls: -0.5 })
+    c.save(); c.fillStyle = MAG; c.fillRect(0, 1720, W, 96)
+    let x = -60; c.font = `700 64px ${G}`; c.letterSpacing = '-2px'; ['CAIXA', 'COMISSÕES', 'FIDELIDADE', 'AGENDA'].forEach((s) => { T(s, x, 1795, `700 64px ${G}`, INK, { ls: -2 }); x += c.measureText(s).width + 36; star(x, 1768, 18, INK); x += 36 })
+    c.restore()
+    meta(IVORY, 'SISTEMA SOB MEDIDA', 'REACT · SUPABASE', 1870)
+  }
+  if (n === 3) {
+    // FECHAMENTO — convite enorme, seta, endereço
+    c.fillStyle = IVORY; c.fillRect(0, 0, W, H); grid(INK, 0.08)
+    meta(INK, '(03) PRÓXIMO PROJETO', 'DISPONÍVEL ●', 104)
+    c.fillStyle = INK; c.fillRect(64, 132, W - 128, 2)
+    T('Conheça', 48, 760, `700 250px ${G}`, INK, { ls: -16 })
+    T('nosso', 48, 990, `700 250px ${G}`, INK, { ls: -16 })
+    T('trabalho', 48, 1220, `700 250px ${G}`, MAG, { ls: -16 })
+    T('↗', W - 60, 990, `400 200px ${G}`, MAG, { a: 'right' })
+    c.fillStyle = INK; c.fillRect(64, 1400, W - 128, 2)
+    T('astrovia-solutions.vercel.app', 64, 1480, `500 46px ${G}`, INK, { ls: -1 })
+    T('Sites · Sistemas · Automação & IA', 64, 1540, `400 26px ${M}`, GREY)
+    c.save(); c.fillStyle = INK; c.beginPath(); c.roundRect(64, 1640, W - 128, 120, 60); c.fill(); c.restore()
+    T('A S T R O V I A', W / 2, 1715, `500 34px ${G}`, IVORY, { a: 'center', ls: 6 })
+  }
+}
+window.ready = document.fonts.load(`700 100px ${G}`).then(() => Promise.all([`500 100px ${G}`, `400 100px ${G}`, `400 20px ${M}`].map((f) => document.fonts.load(f)))).then(() => frame(+new URLSearchParams(location.search).get('f') || 1))
+</script></body></html>

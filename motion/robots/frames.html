@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Astrovia — Agentes (styleframes)</title>
+<style>
+@font-face{font-family:"Space Grotesk";font-weight:400;src:url(../fonts/space-grotesk-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:500;src:url(../fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:700;src:url(../fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Mono";font-weight:400;src:url(../fonts/space-mono-latin-400-normal.woff2) format("woff2")}
+*{margin:0;padding:0}html,body{width:1080px;height:1920px;overflow:hidden;background:#000}canvas{display:block}
+</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
+<script>
+const W = 1080, H = 1920, CX = 540
+const SPACE = '#07060B', IVORY = '#EFEBE4', MAG = '#E2408F', TEAL = '#3DD9C5', GREY = '#8D8893', INK = '#0B0A0D'
+const G = '"Space Grotesk"', M = '"Space Mono"', UI = 'Inter'
+const c = document.getElementById('c').getContext('2d')
+const rnd = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s) }
+function T(s, x, y, f, col, o = {}) { c.save(); c.font = f; c.fillStyle = col; c.textAlign = o.a || 'left'; c.letterSpacing = (o.ls || 0) + 'px'; c.globalAlpha *= o.al ?? 1; if (o.glow) { c.shadowColor = o.glow; c.shadowBlur = 24 } if (o.stroke) { c.strokeStyle = col; c.lineWidth = o.stroke; c.strokeText(s, x, y) } else c.fillText(s, x, y); c.restore() }
+function tw(s, f, ls = 0) { c.save(); c.font = f; c.letterSpacing = ls + 'px'; const w = c.measureText(s).width; c.restore(); return w }
+function rr(x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r) }
+function meta(l, r, y, col = IVORY) { T(l, 64, y, `400 22px ${M}`, col, { ls: 1, al: 0.75 }); T(r, W - 64, y, `400 22px ${M}`, col, { a: 'right', ls: 1, al: 0.75 }) }
+function star(x, y, r, col, rot = 0) { c.save(); c.translate(x, y); c.rotate(rot); c.fillStyle = col; c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4, q = i % 2 ? r * 0.26 : r; c.lineTo(Math.cos(a) * q, Math.sin(a) * q) } c.closePath(); c.fill(); c.restore() }
+
+function space(seed = 1) {
+  c.fillStyle = SPACE; c.fillRect(0, 0, W, H)
+  const neb = (x, y, r, col) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H) }
+  neb(900, 400, 700, 'rgba(226,64,143,.16)'); neb(100, 1500, 800, 'rgba(110,80,255,.14)')
+  for (let i = 0; i < 420; i++) { const x = rnd(i * 3 + seed) * W, y = rnd(i * 7 + seed) * H, s = rnd(i + seed * 9) < 0.95 ? 1.6 : 3; c.globalAlpha = 0.25 + rnd(i * 11) * 0.7; c.fillStyle = rnd(i * 5) < 0.12 ? '#ffd1e6' : '#fff'; c.fillRect(x, y, s, s) }
+  c.globalAlpha = 1
+  c.save(); c.globalAlpha = 0.05; c.fillStyle = IVORY; for (let i = 1; i < 6; i++) c.fillRect(Math.round((i * W) / 6), 0, 1, H); c.restore()
+}
+// asteroide facetado com luz lateral + etiqueta da tarefa
+function rock(x, y, r, seed, label, blur = 0) {
+  c.save(); c.translate(x, y); c.rotate(rnd(seed) * 6)
+  if (blur) { c.save(); c.globalAlpha = 0.18; for (let k = 1; k < 7; k++) { c.translate(-blur, -blur * 0.3); poly() ; c.fillStyle = '#5b5560'; c.fill() } c.restore() }
+  function poly() { c.beginPath(); const n = 9; for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2, q = r * (0.78 + rnd(seed * 13 + i) * 0.3); c.lineTo(Math.cos(a) * q, Math.sin(a) * q) } c.closePath() }
+  poly(); const g = c.createRadialGradient(-r * 0.4, -r * 0.4, r * 0.1, 0, 0, r * 1.2); g.addColorStop(0, '#CFC8CC'); g.addColorStop(0.45, '#6E6670'); g.addColorStop(1, '#1E1A22'); c.fillStyle = g; c.fill()
+  c.strokeStyle = 'rgba(226,64,143,.55)'; c.lineWidth = 2; c.stroke()
+  for (let i = 0; i < 5; i++) { const a = rnd(seed * 3 + i) * 6.28, d = rnd(seed * 5 + i) * r * 0.55, cr = r * (0.08 + rnd(seed + i) * 0.12); c.fillStyle = 'rgba(0,0,0,.13)'; c.beginPath(); c.arc(Math.cos(a) * d, Math.sin(a) * d, cr, 0, 7); c.fill(); c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 1.5; c.beginPath(); c.arc(Math.cos(a) * d + 1, Math.sin(a) * d + 1, cr, 3.6, 5.6); c.stroke() }
+  c.restore()
+  if (label) { const f = `400 ${Math.max(16, r * 0.22)}px ${M}`, w = tw(label, f, 1) + 28, lx = x + r * 0.7, ly = y - r * 0.9; c.save(); c.strokeStyle = 'rgba(239,235,228,.5)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x + r * 0.5, y - r * 0.5); c.lineTo(lx, ly + 10); c.stroke(); c.fillStyle = 'rgba(11,10,13,.85)'; rr(lx, ly - 22, w, 38, 8); c.fill(); c.strokeStyle = MAG; c.stroke(); T(label, lx + 14, ly + 4, f, IVORY, { ls: 1 }); c.restore() }
+}
+// agente Astrovia: drone geométrico com olho magenta e rastro
+function drone(x, y, s, rot = 0, trail = 1) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.scale(s, s)
+  if (trail) { const g = c.createLinearGradient(0, 40, 0, 40 + 380 * trail); g.addColorStop(0, 'rgba(226,64,143,.9)'); g.addColorStop(0.3, 'rgba(226,64,143,.35)'); g.addColorStop(1, 'rgba(226,64,143,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(-22, 40); c.lineTo(22, 40); c.lineTo(6, 40 + 380 * trail); c.lineTo(-6, 40 + 380 * trail); c.closePath(); c.fill() }
+  // asas
+  c.fillStyle = '#1B1922'; c.beginPath(); c.moveTo(-40, 10); c.lineTo(-96, 46); c.lineTo(-90, 58); c.lineTo(-36, 34); c.closePath(); c.fill(); c.beginPath(); c.moveTo(40, 10); c.lineTo(96, 46); c.lineTo(90, 58); c.lineTo(36, 34); c.closePath(); c.fill()
+  c.fillStyle = MAG; c.fillRect(-98, 50, 10, 4); c.fillRect(88, 50, 10, 4)
+  // corpo
+  const g = c.createLinearGradient(-50, -60, 50, 60); g.addColorStop(0, '#3A3642'); g.addColorStop(0.5, '#15131B'); g.addColorStop(1, '#08070A')
+  c.fillStyle = g; rr(-46, -62, 92, 112, 46); c.fill(); c.strokeStyle = 'rgba(239,235,228,.55)'; c.lineWidth = 2; rr(-46, -62, 92, 112, 46); c.stroke()
+  // olho
+  c.save(); c.shadowColor = MAG; c.shadowBlur = 30; c.fillStyle = '#0a0a0e'; c.beginPath(); c.arc(0, -18, 26, 0, 7); c.fill(); c.strokeStyle = MAG; c.lineWidth = 5; c.stroke(); c.fillStyle = MAG; c.beginPath(); c.arc(0, -18, 9, 0, 7); c.fill(); c.restore()
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(-7, -26, 4, 0, 7); c.fill()
+  star(0, 26, 9, IVORY)
+  c.restore()
+}
+function laser(x1, y1, x2, y2, w = 6) { c.save(); c.globalCompositeOperation = 'lighter'; c.lineCap = 'round'; c.strokeStyle = 'rgba(226,64,143,.35)'; c.lineWidth = w * 4; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); c.strokeStyle = '#FF8FC4'; c.lineWidth = w; c.stroke(); c.strokeStyle = '#fff'; c.lineWidth = w * 0.35; c.stroke(); c.restore() }
+function lock(x, y, r, label) { c.save(); c.strokeStyle = MAG; c.lineWidth = 3; c.shadowColor = MAG; c.shadowBlur = 12; const L = r * 0.45; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => { c.beginPath(); c.moveTo(x + sx * r, y + sy * (r - L)); c.lineTo(x + sx * r, y + sy * r); c.lineTo(x + sx * (r - L), y + sy * r); c.stroke() }); c.restore(); T(label, x - r, y + r + 34, `400 20px ${M}`, MAG, { ls: 1 }) }
+function burst(x, y, r, seed) { c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,143,196,.85)'); g.addColorStop(1, 'rgba(226,64,143,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); for (let i = 0; i < 60; i++) { const a = rnd(seed + i) * 6.28, d = r * (0.4 + rnd(seed * 2 + i) * 1.1); c.fillStyle = i % 3 ? '#FFB3D6' : '#fff'; c.fillRect(x + Math.cos(a) * d, y + Math.sin(a) * d, 4, 4) } c.restore() }
+function doneCard(x, y, title, sub, rot = 0, a = 1) { c.save(); c.globalAlpha = a; c.translate(x, y); c.rotate(rot); c.shadowColor = 'rgba(226,64,143,.45)'; c.shadowBlur = 40; c.fillStyle = '#fff'; rr(-210, -56, 420, 112, 26); c.fill(); c.shadowBlur = 0; c.fillStyle = '#1F9D5A'; c.beginPath(); c.arc(-150, 0, 30, 0, 7); c.fill(); T('✓', -150, 11, `700 30px ${UI}`, '#fff', { a: 'center' }); T(title, -104, -6, `700 28px ${UI}`, INK); T(sub, -104, 26, `500 21px ${UI}`, '#6E6A78'); c.restore() }
+
+async function frame(n) {
+  if (n === 1) {
+    space(1)
+    meta('(01) ALERTA', 'ASTROVIA · SISTEMA DE DEFESA', 104)
+    // campo de tarefas vindo da profundidade
+    const rocks = [[700, 1500, 170, 'BOLETO_038'], [250, 1310, 120, 'PLANILHA_FINAL_v7.xlsx'], [690, 1120, 80, 'NOTA FISCAL'], [380, 960, 54, '"oi, tem horário?"'], [880, 900, 44, 'ESTOQUE'], [160, 1700, 210, 'RESPONDER CLIENTE'], [560, 820, 30, ''], [470, 1500, 70, 'FOLLOW-UP'], [980, 1180, 36, '']]
+    rocks.slice().sort((a, b) => a[2] - b[2]).forEach(([x, y, r, l], i) => rock(x, y, r, i + 3, l, r > 100 ? r * 0.06 : 0))
+    T('O TRABALHO', 64, 340, `700 128px ${G}`, IVORY, { ls: -6 })
+    T('REPETITIVO', 64, 460, `700 128px ${G}`, IVORY, { ls: -6, stroke: 2.5 })
+    T('ESTÁ INVADINDO.', 64, 580, `700 112px ${G}`, MAG, { ls: -5 })
+    c.save(); c.fillStyle = 'rgba(226,64,143,.14)'; rr(64, 1810 - 46, 560, 64, 10); c.fill(); c.strokeStyle = MAG; c.lineWidth = 2; c.stroke(); c.restore()
+    c.fillStyle = MAG; c.beginPath(); c.arc(98, 1810 - 14, 9, 0, 7); c.fill()
+    T('AMEAÇAS DETECTADAS: 1.284', 122, 1806, `400 26px ${M}`, IVORY, { ls: 2 })
+  }
+  if (n === 2) {
+    space(2)
+    meta('(02) AGENTES ATIVADOS', 'MODO AUTÔNOMO ●', 104)
+    T('1.284', 64, 300, `700 150px ${G}`, IVORY, { ls: -8 }); T('→ 0', 64 + tw('1.284 ', `700 150px ${G}`, -8), 300, `700 150px ${G}`, MAG, { ls: -8 })
+    T('tarefas resolvidas sem ninguém tocar', 70, 360, `400 28px ${M}`, GREY)
+    // alvos
+    rock(780, 760, 96, 11, 'PLANILHA.xlsx'); lock(780, 760, 130, 'TARGET LOCKED · 98%')
+    rock(230, 900, 70, 12, 'NOTA FISCAL'); lock(230, 900, 100, 'LOCKED')
+    laser(540, 1480, 640, 1110); laser(300, 1600, 230, 950, 5); laser(800, 1590, 780, 800, 5)
+    burst(640, 1080, 150, 7)
+    doneCard(640, 1080, 'Respondido em 3s', 'cliente agendado às 15h', -0.05)
+    doneCard(300, 600, 'Nota emitida', 'NF 1.284 · enviada por e-mail', 0.04, 0.9)
+    doneCard(740, 1330, 'Boleto conciliado', 'R$ 1.250,00 · baixa automática', 0.03, 0.9)
+    drone(540, 1560, 1.25, 0, 0.9); drone(300, 1660, 1.0, -0.12, 0.8); drone(800, 1650, 1.0, 0.12, 0.8)
+    T('AGENTE 01 · ATENDIMENTO', 540, 1770, `400 20px ${M}`, MAG, { a: 'center', ls: 2 })
+  }
+  if (n === 3) {
+    space(3)
+    meta('(03) MISSÃO CUMPRIDA', 'ASTROVIA SOLUTIONS', 104)
+    // órbita com drones
+    c.save(); c.translate(CX, 780); c.rotate(-0.2); c.strokeStyle = 'rgba(239,235,228,.25)'; c.lineWidth = 2; c.beginPath(); c.ellipse(0, 0, 460, 150, 0, 0, 7); c.stroke(); c.strokeStyle = MAG; c.lineWidth = 3; c.beginPath(); c.ellipse(0, 0, 460, 150, 0, 3.6, 5.6); c.stroke(); c.restore()
+    T('ASTROVIA', CX, 830, `700 190px ${G}`, IVORY, { a: 'center', ls: -10 })
+    drone(150, 700, 0.55, 1.2, 0.5); drone(930, 860, 0.55, -1.9, 0.5); drone(700, 640, 0.42, 1.6, 0.45)
+    T('Automação & IA', 64, 1180, `700 96px ${G}`, IVORY, { ls: -4 })
+    T('que trabalha', 64, 1280, `700 96px ${G}`, IVORY, { ls: -4, stroke: 2.5 })
+    T('enquanto você vive.', 64, 1380, `700 96px ${G}`, MAG, { ls: -4 })
+    c.fillStyle = IVORY; c.fillRect(64, 1500, W - 128, 2)
+    T('Conheça nosso trabalho ↗', 64, 1580, `500 46px ${G}`, IVORY)
+    T('astrovia-solutions.vercel.app', 64, 1636, `400 26px ${M}`, GREY)
+    star(W - 110, 1570, 40, MAG, 0.4)
+  }
+}
+window.ready = Promise.all([`700 100px ${G}`, `500 100px ${G}`, `400 100px ${G}`, `400 20px ${M}`, `700 20px ${UI}`].map((f) => document.fonts.load(f))).then(() => frame(+new URLSearchParams(location.search).get('f') || 1))
+</script></body></html>

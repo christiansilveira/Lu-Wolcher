@@ -21,18 +21,25 @@ const glc = document.getElementById('gl'), ov = document.getElementById('ov').ge
 const r = new THREE.WebGLRenderer({ canvas: glc, antialias: true, preserveDrawingBuffer: true })
 r.setPixelRatio(1); r.setSize(W, H, false); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace
 const env = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture
-const scene = new THREE.Scene(); scene.environment = env; scene.environmentIntensity = 0.45
+const scene = new THREE.Scene(); scene.environment = env; scene.environmentIntensity = 0.25
 const cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 2000)
 const composer = new EffectComposer(r); composer.setPixelRatio(1); composer.setSize(W, H)
 composer.addPass(new RenderPass(scene, cam)); const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.5, 0.82); composer.addPass(bloom); composer.addPass(new OutputPass())
-const key = new THREE.DirectionalLight('#ffe6f2', 2.4); key.position.set(6, 8, 6); scene.add(key)
-const rim = new THREE.DirectionalLight('#7b5cff', 2.0); rim.position.set(-8, 2, -6); scene.add(rim)
-scene.add(new THREE.AmbientLight('#ffffff', 0.15))
-const load = (f) => new GLTFLoader().loadAsync('models/' + f)
+const key = new THREE.DirectionalLight('#fff4ea', 3.4); key.position.set(9, 6, 4); scene.add(key)
+const rim = new THREE.DirectionalLight('#a36bff', 1.6); rim.position.set(-8, 1, -8); scene.add(rim)
+const nebLight = new THREE.DirectionalLight('#E2408F', 0.6); nebLight.position.set(-4, 4, -10); scene.add(nebLight)
+scene.add(new THREE.AmbientLight('#ffffff', 0.04))
+// converte materiais antigos KHR_materials_pbrSpecularGlossiness (ex.: asteroides) para PBR padrão
+class SpecGloss { constructor(parser) { this.parser = parser; this.name = 'KHR_materials_pbrSpecularGlossiness' }
+  extendMaterialParams(i, params) { const ext = this.parser.json.materials[i].extensions?.[this.name]; if (!ext) return Promise.resolve()
+    if (ext.diffuseFactor) params.color = new THREE.Color().setRGB(ext.diffuseFactor[0], ext.diffuseFactor[1], ext.diffuseFactor[2], THREE.LinearSRGBColorSpace)
+    params.roughness = 1 - (ext.glossinessFactor ?? 1) * 0.55; params.metalness = 0
+    return ext.diffuseTexture ? this.parser.assignTexture(params, 'map', ext.diffuseTexture, THREE.SRGBColorSpace) : Promise.resolve() } }
+const load = (f) => { const l = new GLTFLoader(); l.register((p) => new SpecGloss(p)); return l.loadAsync('models/' + f) }
 const fit = (obj, size) => { const b = new THREE.Box3().setFromObject(obj), s = b.getSize(new THREE.Vector3()), k = size / Math.max(s.x, s.y, s.z), c = b.getCenter(new THREE.Vector3()); const g = new THREE.Group(); obj.position.sub(c); g.add(obj); g.scale.setScalar(k); return g }
 const magEyes = (root) => root.traverse((o) => { if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => { if (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.05) { m.emissive.set(MAG); m.emissiveIntensity = 4 } }) } })
 function laser(a, b) { const d = new THREE.Vector3().subVectors(b, a), L = d.length(); const grp = new THREE.Group()
-  ;[[0.018, '#ffffff', 1], [0.045, '#ff7fbf', 0.8], [0.11, MAG, 0.25]].forEach(([rad, col, op]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, L, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); grp.add(m) })
+  ;[[0.014, '#ffffff', 1], [0.035, '#ff7fbf', 0.75], [0.09, MAG, 0.22]].forEach(([rad, col, op]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, L, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); grp.add(m) })
   grp.position.copy(a).addScaledVector(d, 0.5); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); scene.add(grp) }
 const glow = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.2, 'rgba(255,150,200,.9)'); g.addColorStop(1, 'rgba(226,64,143,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
 function flash(p, s) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); sp.position.copy(p); sp.scale.setScalar(s); scene.add(sp) }
@@ -44,16 +51,64 @@ function card(x, y, title, sub, rot) { ov.save(); ov.translate(x, y); ov.rotate(
 
 window.ready = (async () => {
   await Promise.all([`700 100px ${G}`, `500 100px ${G}`, `400 20px ${M}`].map((f) => document.fonts.load(f)))
-  const [sky, rocks, drone, cb1, mother] = await Promise.all(['alien_space_nebula_2_skybox.glb', 'space_station.glb', 'scifi_drone.glb', 'spaceship_-_cb1.glb', 'cool_alien_spaceship_by_jungle_jim.glb'].map(load))
-  // céu: estrelas reais em 3D (nítidas) + nebulosas como luz difusa, nas cores da marca
-  scene.background = new THREE.Color('#05040A')
-  const rn = (n) => { const q = Math.sin(n * 127.1 + 311.7) * 43758.5453; return q - Math.floor(q) }
-  const sp = [], sc = []
-  for (let i = 0; i < 6000; i++) { const u = rn(i * 3.1) * 2 - 1, th = rn(i * 7.3) * Math.PI * 2, R = 400, q = Math.sqrt(1 - u * u); sp.push(Math.cos(th) * q * R, u * R, Math.sin(th) * q * R); const k = rn(i * 2.2), cc = new THREE.Color(k < 0.08 ? '#ffd1e6' : k < 0.16 ? '#c9f5ef' : '#ffffff').multiplyScalar(0.35 + rn(i * 5.1) * 0.9); sc.push(cc.r, cc.g, cc.b) }
-  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3))
-  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true, depthWrite: false, toneMapped: false })))
-  ;[[-30, 25, -160, 140, '#E2408F', 0.22], [40, -10, -180, 160, '#7B5CFF', 0.25], [10, 40, -200, 120, '#3DD9C5', 0.1], [-50, -40, -170, 130, '#5A28A0', 0.25]].forEach(([x, y, z, sz, col, op]) => { const n = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false })); n.position.set(x, y, z); n.scale.setScalar(sz); scene.add(n) })
-  const ast = fit(rocks.scene, 11); ast.position.set(1.2, 5.2, -20); ast.rotation.set(0.3, 0.8, 0); scene.add(ast)
+  const [sky, rocks, drone, cb1, mother] = await Promise.all(['alien_space_nebula_2_skybox.glb', 'wandering_asteroids.glb', 'scifi_drone.glb', 'spaceship_-_cb1.glb', 'cool_alien_spaceship_by_jungle_jim.glb'].map(load))
+  // ===== céu realista: nebulosa procedural (filamentos + poeira escura), faixa galáctica, estrelas e planeta =====
+  scene.background = new THREE.Color('#020205')
+  const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: {},
+    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vDir;
+      float h(vec3 p){ p = fract(p*0.3183099+.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+      float n(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0-2.0*f);
+        return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x), mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y), mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x), mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y), f.z); }
+      float fbm(vec3 p){ float a = .5, s = 0.; for(int i=0;i<6;i++){ s += a*n(p); p = p*2.03 + 7.1; a *= .5; } return s; }
+      void main(){
+        vec3 d = normalize(vDir);
+        // nebulosa concentrada atrás dos asteroides, com distorção de domínio (filamentos)
+        vec3 c0 = normalize(vec3(-0.15, 0.35, -1.0));
+        float focus = smoothstep(0.35, 1.0, dot(d, c0));
+        vec3 q = d*3.2; vec3 w = vec3(fbm(q+1.7), fbm(q+9.2), fbm(q+4.4));
+        float neb = fbm(q*1.6 + w*2.4);
+        float fil = pow(clamp(neb*1.25-0.35, 0.0, 1.0), 2.2);
+        float dust = smoothstep(0.45, 0.75, fbm(q*2.4 + w*3.0 + 3.0));
+        vec3 col = mix(vec3(0.20,0.03,0.12), vec3(0.42,0.05,0.24), fil);           // magenta profundo
+        col = mix(col, vec3(0.10,0.06,0.30), smoothstep(0.4,0.8,w.x));            // violeta
+        col += vec3(0.02,0.12,0.13) * smoothstep(0.55,0.9,w.y) * fil;              // toque teal
+        vec3 nebula = col * fil * focus * (1.0 - dust*0.85) * 1.6;
+        // faixa galáctica (Via Láctea) em diagonal
+        vec3 bn = normalize(vec3(0.55, 0.8, 0.2));
+        float band = exp(-pow(dot(d, bn)/0.22, 2.0));
+        float bd = fbm(d*6.0+2.0);
+        vec3 milky = vec3(0.16,0.14,0.18) * band * smoothstep(0.35,0.75,bd) * (1.0 - smoothstep(0.5,0.8,fbm(d*9.0))*0.8);
+        gl_FragColor = vec4(nebula + milky, 1.0);
+      }` })
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(900, 64, 32), skyMat))
+  const rn = (k) => { const q = Math.sin(k * 127.1 + 311.7) * 43758.5453; return q - Math.floor(q) }
+  // estrelas: três camadas de tamanho/brilho, cores reais (azuladas, brancas, amareladas)
+  const starCols = ['#9bb0ff', '#cad7ff', '#ffffff', '#fff4e8', '#ffd2a1']
+  ;[[9000, 1.2, 0.55], [1800, 2.0, 0.9], [220, 3.2, 1.0]].forEach(([N, size, br], L) => {
+    const sp = [], sc = []
+    for (let i = 0; i < N; i++) { const k = i + L * 1e5, u = rn(k * 3.1) * 2 - 1, th = rn(k * 7.3) * Math.PI * 2, R = 800, qq = Math.sqrt(1 - u * u); sp.push(Math.cos(th) * qq * R, u * R, Math.sin(th) * qq * R); const cc = new THREE.Color(starCols[Math.floor(rn(k * 2.2) * 5)]).multiplyScalar(br * (0.35 + rn(k * 5.1) * 0.65)); sc.push(cc.r, cc.g, cc.b) }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3))
+    scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, depthWrite: false, toneMapped: false })))
+  })
+  // estrelas brilhantes com difração (cruz) — o "selo" de foto de telescópio
+  const spike = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d'); const g = x.createRadialGradient(128, 128, 0, 128, 128, 40); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 256, 256)
+    ;[[1, 0], [0, 1]].forEach(([a, b]) => { const lg = x.createLinearGradient(128 - a * 128, 128 - b * 128, 128 + a * 128, 128 + b * 128); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,.9)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = lg; if (a) x.fillRect(0, 126, 256, 4); else x.fillRect(126, 0, 4, 256) }); return new THREE.CanvasTexture(cv) })()
+  for (let i = 0; i < 14; i++) { const u = rn(i * 9.7) * 1.4 - 0.4, th = -Math.PI / 2 + (rn(i * 4.3) - 0.5) * 1.6, R = 600, qq = Math.sqrt(1 - u * u); const s2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: spike, color: starCols[i % 5], blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, transparent: true, opacity: 0.85 })); s2.position.set(Math.cos(th) * qq * R, u * R, Math.sin(th) * qq * R); s2.scale.setScalar(10 + rn(i * 3.3) * 18); scene.add(s2) }
+  // planeta gasoso com atmosfera (terminador iluminado pelo sol)
+  const pc = document.createElement('canvas'); pc.width = 2048; pc.height = 1024; const px = pc.getContext('2d')
+  for (let y = 0; y < 1024; y++) { const t = y / 1024, b = Math.sin(t * 40 + Math.sin(t * 9) * 3) * 0.5 + 0.5, b2 = Math.sin(t * 130) * 0.5 + 0.5; const r_ = 18 + b * 26 + b2 * 6, g_ = 12 + b * 12, bl = 30 + b * 34 + b2 * 10; px.fillStyle = `rgb(${r_|0},${g_|0},${bl|0})`; px.fillRect(0, y, 2048, 1) }
+  px.globalAlpha = 0.25; for (let i = 0; i < 400; i++) { px.fillStyle = rn(i) < 0.5 ? '#2a1640' : '#7a4a9a'; px.beginPath(); px.ellipse(rn(i * 3) * 2048, rn(i * 5) * 1024, 40 + rn(i * 7) * 220, 4 + rn(i * 11) * 10, 0, 0, 7); px.fill() }
+  const ptex = new THREE.CanvasTexture(pc); ptex.colorSpace = THREE.SRGBColorSpace
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(200, 128, 64), new THREE.MeshStandardMaterial({ map: ptex, roughness: 0.95, metalness: 0 }))
+  planet.position.set(-140, -212, -330); planet.rotation.set(0.35, 0.6, 0.25); scene.add(planet)
+  const atm = new THREE.Mesh(new THREE.SphereGeometry(208, 96, 48), new THREE.ShaderMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
+    uniforms: { sun: { value: new THREE.Vector3(9, 6, 4).normalize() } },
+    vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN = normalize(mat3(modelMatrix)*normal); vec4 w = modelMatrix*vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform vec3 sun; varying vec3 vN; varying vec3 vW; void main(){ vec3 v = normalize(cameraPosition - vW); float rim = pow(1.0 - abs(dot(v, -vN)), 3.0); float lit = clamp(dot(-vN, sun)*0.7+0.4, 0.0, 1.0); gl_FragColor = vec4(vec3(0.45,0.35,1.0)*rim*lit*1.6, rim*lit); }` }))
+  atm.position.copy(planet.position); scene.add(atm)
+  const ast = fit(rocks.scene, 13); ast.position.set(0.8, 5.0, -19); ast.rotation.set(0.2, 0.5, 0.1); scene.add(ast)
+  const ast2 = fit(SkeletonUtils.clone(rocks.scene), 7); ast2.position.set(-6, 9, -30); ast2.rotation.set(1.2, 2.0, 0.4); scene.add(ast2)
   const ms = fit(mother.scene, 6); ms.position.set(-6.5, 8.5, -34); ms.rotation.set(0.15, 0.9, 0); magEyes(ms); scene.add(ms)
   const dpos = [[0, -1.5, 7.5, 1.0], [-1.55, -2.0, 5.0, 0.8], [1.6, -1.95, 4.8, 0.8]], drones = []
   dpos.forEach(([x, y, z, sz]) => { const d = fit(SkeletonUtils.clone(drone.scene), sz); magEyes(d); d.position.set(x, y, z); d.rotation.set(-0.2, Math.PI * 0.82 + x * 0.12, 0); scene.add(d); drones.push(d) })

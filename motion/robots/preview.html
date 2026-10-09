@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><style>*{margin:0}body{background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/addons/"}}</script></head><body>
+<canvas id="c" width="1200" height="900"></canvas>
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true })
+r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace
+const env = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture
+window.shot = async (file, az, el, animT) => {
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#14121a'); scene.environment = env
+  scene.add(new THREE.DirectionalLight('#fff', 2).translateX(3).translateY(5).translateZ(4))
+  const g = await new GLTFLoader().loadAsync('models/' + file)
+  const root = g.scene; scene.add(root)
+  if (g.animations.length) { const mx = new THREE.AnimationMixer(root); mx.clipAction(g.animations[0]).play(); mx.update(animT || 0.5) }
+  const box = new THREE.Box3().setFromObject(root), s = box.getSize(new THREE.Vector3()), cen = box.getCenter(new THREE.Vector3())
+  const R = s.length() * 0.75, cam = new THREE.PerspectiveCamera(35, 1200 / 900, R / 100, R * 100)
+  cam.position.set(cen.x + Math.sin(az) * Math.cos(el) * R * 1.6, cen.y + Math.sin(el) * R * 1.6, cen.z + Math.cos(az) * Math.cos(el) * R * 1.6); cam.lookAt(cen)
+  r.setSize(1200, 900, false); r.render(scene, cam)
+  return { size: [s.x, s.y, s.z].map((v) => +v.toFixed(2)), dataUrl: r.domElement.toDataURL('image/jpeg', 0.9) }
+}
+window.ready = true
+</script></body></html>

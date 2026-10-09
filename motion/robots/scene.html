@@ -1,0 +1,81 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Astrovia — batalha 3D</title>
+<style>
+@font-face{font-family:"Space Grotesk";font-weight:500;src:url(../fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:700;src:url(../fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Mono";font-weight:400;src:url(../fonts/space-mono-latin-400-normal.woff2) format("woff2")}
+*{margin:0}html,body{width:1080px;height:1920px;overflow:hidden;background:#000}canvas{display:block;position:absolute;left:0;top:0}#gl,#ov{visibility:hidden}
+</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/addons/"}}</script></head><body>
+<canvas id="gl" width="1080" height="1920"></canvas><canvas id="ov" width="1080" height="1920"></canvas><canvas id="out" width="1080" height="1920"></canvas>
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
+const W = 1080, H = 1920, MAG = '#E2408F', IVORY = '#EFEBE4', G = '"Space Grotesk"', M = '"Space Mono"'
+const glc = document.getElementById('gl'), ov = document.getElementById('ov').getContext('2d'), out = document.getElementById('out').getContext('2d')
+const r = new THREE.WebGLRenderer({ canvas: glc, antialias: true, preserveDrawingBuffer: true })
+r.setPixelRatio(1); r.setSize(W, H, false); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace
+const env = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture
+const scene = new THREE.Scene(); scene.environment = env; scene.environmentIntensity = 0.45
+const cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 2000)
+const composer = new EffectComposer(r); composer.setPixelRatio(1); composer.setSize(W, H)
+composer.addPass(new RenderPass(scene, cam)); const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.5, 0.82); composer.addPass(bloom); composer.addPass(new OutputPass())
+const key = new THREE.DirectionalLight('#ffe6f2', 2.4); key.position.set(6, 8, 6); scene.add(key)
+const rim = new THREE.DirectionalLight('#7b5cff', 2.0); rim.position.set(-8, 2, -6); scene.add(rim)
+scene.add(new THREE.AmbientLight('#ffffff', 0.15))
+const load = (f) => new GLTFLoader().loadAsync('models/' + f)
+const fit = (obj, size) => { const b = new THREE.Box3().setFromObject(obj), s = b.getSize(new THREE.Vector3()), k = size / Math.max(s.x, s.y, s.z), c = b.getCenter(new THREE.Vector3()); const g = new THREE.Group(); obj.position.sub(c); g.add(obj); g.scale.setScalar(k); return g }
+const magEyes = (root) => root.traverse((o) => { if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => { if (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.05) { m.emissive.set(MAG); m.emissiveIntensity = 4 } }) } })
+function laser(a, b) { const d = new THREE.Vector3().subVectors(b, a), L = d.length(); const grp = new THREE.Group()
+  ;[[0.018, '#ffffff', 1], [0.045, '#ff7fbf', 0.8], [0.11, MAG, 0.25]].forEach(([rad, col, op]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, L, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); grp.add(m) })
+  grp.position.copy(a).addScaledVector(d, 0.5); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); scene.add(grp) }
+const glow = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.2, 'rgba(255,150,200,.9)'); g.addColorStop(1, 'rgba(226,64,143,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
+function flash(p, s) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); sp.position.copy(p); sp.scale.setScalar(s); scene.add(sp) }
+const proj = (v) => { const p = v.clone().project(cam); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H] }
+function T(s, x, y, f, col, o = {}) { ov.save(); ov.font = f; ov.fillStyle = col; ov.textAlign = o.a || 'left'; ov.letterSpacing = (o.ls || 0) + 'px'; if (o.stroke) { ov.strokeStyle = col; ov.lineWidth = o.stroke; ov.strokeText(s, x, y) } else ov.fillText(s, x, y); ov.restore() }
+function tag(x, y, label) { const f = `400 22px ${M}`; ov.font = f; ov.letterSpacing = '1px'; const w = ov.measureText(label).width + 28; ov.fillStyle = 'rgba(11,10,13,.85)'; ov.beginPath(); ov.roundRect(x, y - 26, w, 40, 8); ov.fill(); ov.strokeStyle = MAG; ov.lineWidth = 2; ov.stroke(); T(label, x + 14, y + 2, f, IVORY, { ls: 1 }) }
+function lock(x, y, R) { ov.save(); ov.strokeStyle = MAG; ov.lineWidth = 3; ov.shadowColor = MAG; ov.shadowBlur = 12; const L = R * 0.45; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => { ov.beginPath(); ov.moveTo(x + sx * R, y + sy * (R - L)); ov.lineTo(x + sx * R, y + sy * R); ov.lineTo(x + sx * (R - L), y + sy * R); ov.stroke() }); ov.restore() }
+function card(x, y, title, sub, rot) { ov.save(); ov.translate(x, y); ov.rotate(rot); ov.shadowColor = 'rgba(226,64,143,.6)'; ov.shadowBlur = 50; ov.fillStyle = '#fff'; ov.beginPath(); ov.roundRect(-220, -58, 440, 116, 28); ov.fill(); ov.shadowBlur = 0; ov.fillStyle = '#1F9D5A'; ov.beginPath(); ov.arc(-158, 0, 32, 0, 7); ov.fill(); T('✓', -158, 11, '700 32px Inter', '#fff', { a: 'center' }); T(title, -110, -6, '700 30px Inter', '#0B0A0D'); T(sub, -110, 27, '500 22px Inter', '#6E6A78'); ov.restore() }
+
+window.ready = (async () => {
+  await Promise.all([`700 100px ${G}`, `500 100px ${G}`, `400 20px ${M}`].map((f) => document.fonts.load(f)))
+  const [sky, rocks, drone, cb1, mother] = await Promise.all(['alien_space_nebula_2_skybox.glb', 'space_station.glb', 'scifi_drone.glb', 'spaceship_-_cb1.glb', 'cool_alien_spaceship_by_jungle_jim.glb'].map(load))
+  // céu: estrelas reais em 3D (nítidas) + nebulosas como luz difusa, nas cores da marca
+  scene.background = new THREE.Color('#05040A')
+  const rn = (n) => { const q = Math.sin(n * 127.1 + 311.7) * 43758.5453; return q - Math.floor(q) }
+  const sp = [], sc = []
+  for (let i = 0; i < 6000; i++) { const u = rn(i * 3.1) * 2 - 1, th = rn(i * 7.3) * Math.PI * 2, R = 400, q = Math.sqrt(1 - u * u); sp.push(Math.cos(th) * q * R, u * R, Math.sin(th) * q * R); const k = rn(i * 2.2), cc = new THREE.Color(k < 0.08 ? '#ffd1e6' : k < 0.16 ? '#c9f5ef' : '#ffffff').multiplyScalar(0.35 + rn(i * 5.1) * 0.9); sc.push(cc.r, cc.g, cc.b) }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3))
+  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true, depthWrite: false, toneMapped: false })))
+  ;[[-30, 25, -160, 140, '#E2408F', 0.22], [40, -10, -180, 160, '#7B5CFF', 0.25], [10, 40, -200, 120, '#3DD9C5', 0.1], [-50, -40, -170, 130, '#5A28A0', 0.25]].forEach(([x, y, z, sz, col, op]) => { const n = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false })); n.position.set(x, y, z); n.scale.setScalar(sz); scene.add(n) })
+  const ast = fit(rocks.scene, 11); ast.position.set(1.2, 5.2, -20); ast.rotation.set(0.3, 0.8, 0); scene.add(ast)
+  const ms = fit(mother.scene, 6); ms.position.set(-6.5, 8.5, -34); ms.rotation.set(0.15, 0.9, 0); magEyes(ms); scene.add(ms)
+  const dpos = [[0, -1.5, 7.5, 1.0], [-1.55, -2.0, 5.0, 0.8], [1.6, -1.95, 4.8, 0.8]], drones = []
+  dpos.forEach(([x, y, z, sz]) => { const d = fit(SkeletonUtils.clone(drone.scene), sz); magEyes(d); d.position.set(x, y, z); d.rotation.set(-0.2, Math.PI * 0.82 + x * 0.12, 0); scene.add(d); drones.push(d) })
+  ;[[-3.6, 0.6, -6, 2.6, 0.5], [3.8, -0.4, -9, 2.3, -0.4]].forEach(([x, y, z, sz, rz]) => { const sh = fit(SkeletonUtils.clone(cb1.scene), sz); sh.position.set(x, y, z); sh.rotation.set(-1.1, 0, rz); magEyes(sh); scene.add(sh) })
+  cam.position.set(0, -1.2, 15); cam.lookAt(0.3, 1.2, -6); cam.updateMatrixWorld()
+  const targets = [new THREE.Vector3(3.0, 6.4, -18), new THREE.Vector3(-1.8, 4.6, -17), new THREE.Vector3(0.4, 3.2, -15)]
+  laser(new THREE.Vector3(0, -1.3, 7.0), targets[2]); laser(new THREE.Vector3(-1.55, -1.8, 4.6), targets[1]); laser(new THREE.Vector3(1.6, -1.75, 4.4), targets[0])
+  flash(targets[2], 3.2); flash(targets[0], 1.4); flash(targets[1], 1.2)
+  window.render = () => {
+    composer.render()
+    ov.clearRect(0, 0, W, H)
+    const g = ov.createLinearGradient(0, 0, 0, 520); g.addColorStop(0, 'rgba(7,6,11,.85)'); g.addColorStop(1, 'rgba(7,6,11,0)'); ov.fillStyle = g; ov.fillRect(0, 0, W, 520)
+    T('(02) AGENTES ATIVADOS', 64, 104, `400 22px ${M}`, IVORY, { ls: 1 }); T('MODO AUTÔNOMO ●', W - 64, 104, `400 22px ${M}`, IVORY, { a: 'right', ls: 1 })
+    T('1.284', 64, 290, `700 150px ${G}`, IVORY, { ls: -8 }); T('→ 0', 520, 290, `700 150px ${G}`, MAG, { ls: -8 })
+    T('tarefas resolvidas sem ninguém tocar', 70, 350, `400 28px ${M}`, '#B9B4C0')
+    const [a1, b1] = proj(targets[0]), [a2, b2] = proj(targets[1]), [a3, b3] = proj(targets[2])
+    lock(a1, b1, 90); tag(a1 + 70, b1 - 100, 'PLANILHA.xlsx · LOCKED')
+    lock(a2, b2, 80); tag(a2 - 300, b2 - 96, 'NOTA FISCAL · LOCKED')
+    card(a3 + 40, b3 + 40, 'Respondido em 3s', 'cliente agendado às 15h', -0.05)
+    T('AGENTES 01 · 02 · 03 — ATENDIMENTO · FINANCEIRO · FISCAL', W / 2, 1830, `400 20px ${M}`, MAG, { a: 'center', ls: 1 })
+    out.drawImage(glc, 0, 0); out.drawImage(document.getElementById('ov'), 0, 0)
+  }
+  window.render(); return true
+})()
+</script></body></html>

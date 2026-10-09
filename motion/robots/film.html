@@ -1,0 +1,259 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Astrovia — Agentes (filme)</title>
+<style>
+@font-face{font-family:"Space Grotesk";font-weight:500;src:url(../fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:700;src:url(../fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Mono";font-weight:400;src:url(../fonts/space-mono-latin-400-normal.woff2) format("woff2")}
+*{margin:0}html,body{width:1080px;height:1920px;overflow:hidden;background:#000}canvas{display:block;position:absolute;left:0;top:0}#gl,#ov{visibility:hidden}
+</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/addons/"}}</script></head><body>
+<canvas id="gl" width="1080" height="1920"></canvas><canvas id="ov" width="1080" height="1920"></canvas><canvas id="out" width="1080" height="1920"></canvas>
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
+const W = 1080, H = 1920, MAG = '#E2408F', IVORY = '#EFEBE4', G = '"Space Grotesk"', M = '"Space Mono"'
+const glc = document.getElementById('gl'), ov = document.getElementById('ov').getContext('2d'), out = document.getElementById('out').getContext('2d')
+const r = new THREE.WebGLRenderer({ canvas: glc, antialias: true, preserveDrawingBuffer: true })
+r.setPixelRatio(1); r.setSize(W, H, false); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace
+const env = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture
+const scene = new THREE.Scene(); scene.environment = env; scene.environmentIntensity = 0.25
+const cam = new THREE.PerspectiveCamera(38, W / H, 0.1, 2000)
+const composer = new EffectComposer(r); composer.setPixelRatio(1); composer.setSize(W, H)
+composer.addPass(new RenderPass(scene, cam)); const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.5, 0.82); composer.addPass(bloom); composer.addPass(new OutputPass())
+const key = new THREE.DirectionalLight('#fff4ea', 3.4); key.position.set(9, 6, 4); scene.add(key)
+const rim = new THREE.DirectionalLight('#a36bff', 1.6); rim.position.set(-8, 1, -8); scene.add(rim)
+const nebLight = new THREE.DirectionalLight('#E2408F', 0.6); nebLight.position.set(-4, 4, -10); scene.add(nebLight)
+scene.add(new THREE.AmbientLight('#ffffff', 0.04))
+// converte materiais antigos KHR_materials_pbrSpecularGlossiness (ex.: asteroides) para PBR padrão
+class SpecGloss { constructor(parser) { this.parser = parser; this.name = 'KHR_materials_pbrSpecularGlossiness' }
+  extendMaterialParams(i, params) { const ext = this.parser.json.materials[i].extensions?.[this.name]; if (!ext) return Promise.resolve()
+    if (ext.diffuseFactor) params.color = new THREE.Color().setRGB(ext.diffuseFactor[0], ext.diffuseFactor[1], ext.diffuseFactor[2], THREE.LinearSRGBColorSpace)
+    params.roughness = 1 - (ext.glossinessFactor ?? 1) * 0.55; params.metalness = 0
+    return ext.diffuseTexture ? this.parser.assignTexture(params, 'map', ext.diffuseTexture, THREE.SRGBColorSpace) : Promise.resolve() } }
+const load = (f) => { const l = new GLTFLoader(); l.register((p) => new SpecGloss(p)); return l.loadAsync('models/' + f) }
+const fit = (obj, size) => { const b = new THREE.Box3().setFromObject(obj), s = b.getSize(new THREE.Vector3()), k = size / Math.max(s.x, s.y, s.z), c = b.getCenter(new THREE.Vector3()); const g = new THREE.Group(); obj.position.sub(c); g.add(obj); g.scale.setScalar(k); return g }
+const magEyes = (root) => root.traverse((o) => { if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => { if (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.05) { m.emissive.set(MAG); m.emissiveIntensity = 4 } }) } })
+function laser(a, b) { const d = new THREE.Vector3().subVectors(b, a), L = d.length(); const grp = new THREE.Group()
+  ;[[0.014, '#ffffff', 1], [0.035, '#ff7fbf', 0.75], [0.09, MAG, 0.22]].forEach(([rad, col, op]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, L, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); grp.add(m) })
+  grp.position.copy(a).addScaledVector(d, 0.5); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); scene.add(grp) }
+const glow = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.2, 'rgba(255,150,200,.9)'); g.addColorStop(1, 'rgba(226,64,143,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
+function flash(p, s) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); sp.position.copy(p); sp.scale.setScalar(s); scene.add(sp) }
+const proj = (v) => { const p = v.clone().project(cam); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H] }
+function T(s, x, y, f, col, o = {}) { ov.save(); ov.font = f; ov.fillStyle = col; ov.textAlign = o.a || 'left'; ov.letterSpacing = (o.ls || 0) + 'px'; if (o.stroke) { ov.strokeStyle = col; ov.lineWidth = o.stroke; ov.strokeText(s, x, y) } else ov.fillText(s, x, y); ov.restore() }
+function tag(x, y, label) { const f = `400 22px ${M}`; ov.font = f; ov.letterSpacing = '1px'; const w = ov.measureText(label).width + 28; ov.fillStyle = 'rgba(11,10,13,.85)'; ov.beginPath(); ov.roundRect(x, y - 26, w, 40, 8); ov.fill(); ov.strokeStyle = MAG; ov.lineWidth = 2; ov.stroke(); T(label, x + 14, y + 2, f, IVORY, { ls: 1 }) }
+function lock(x, y, R) { ov.save(); ov.strokeStyle = MAG; ov.lineWidth = 3; ov.shadowColor = MAG; ov.shadowBlur = 12; const L = R * 0.45; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => { ov.beginPath(); ov.moveTo(x + sx * R, y + sy * (R - L)); ov.lineTo(x + sx * R, y + sy * R); ov.lineTo(x + sx * (R - L), y + sy * R); ov.stroke() }); ov.restore() }
+function card(x, y, title, sub, rot) { ov.save(); ov.translate(x, y); ov.rotate(rot); ov.shadowColor = 'rgba(226,64,143,.6)'; ov.shadowBlur = 50; ov.fillStyle = '#fff'; ov.beginPath(); ov.roundRect(-220, -58, 440, 116, 28); ov.fill(); ov.shadowBlur = 0; ov.fillStyle = '#1F9D5A'; ov.beginPath(); ov.arc(-158, 0, 32, 0, 7); ov.fill(); T('✓', -158, 11, '700 32px Inter', '#fff', { a: 'center' }); T(title, -110, -6, '700 30px Inter', '#0B0A0D'); T(sub, -110, 27, '500 22px Inter', '#6E6A78'); ov.restore() }
+
+
+/* ====================== FILME: agentes Astrovia vs. trabalho repetitivo ====================== */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), lerp = (a, b, k) => a + (b - a) * k, seg = (u, a, d) => clamp((u - a) / d)
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3), eIn = (x) => Math.pow(clamp(x), 3), eIO = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2 }
+const eExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * clamp(x))), eBack = (x, k = 1.7) => { x = clamp(x); return 1 + (k + 1) * Math.pow(x - 1, 3) + k * Math.pow(x - 1, 2) }
+const rn = (k) => { const q = Math.sin(k * 127.1 + 311.7) * 43758.5453; return q - Math.floor(q) }
+const V = (x, y, z) => new THREE.Vector3(x, y, z)
+const TOTAL = 23, FPS = 60
+const SHOTS = [0, 5, 8, 14, 16, 23]
+const HITS = [
+  [8.5, 'NOTA FISCAL', 'Nota emitida', 'NF 1.284 · enviada por e-mail', -2.2, 1.8],
+  [9.2, '"oi, tem horário?"', 'Respondido em 3s', 'cliente agendado às 15h', 2.4, 3.2],
+  [9.9, 'BOLETO_038', 'Boleto conciliado', 'R$ 1.250,00 · baixa automática', -1.0, 4.4],
+  [10.6, 'FOLLOW-UP', 'Follow-up enviado', '12 clientes · WhatsApp', 2.8, 1.4],
+  [11.3, 'ESTOQUE', 'Estoque atualizado', 'reposição pedida sozinha', -2.8, 3.6],
+  [12.0, 'RELATÓRIO', 'Relatório pronto', 'enviado às 08h', 1.2, 2.2],
+  [12.7, 'LEMBRETES', 'Lembretes enviados', '38 confirmações', -0.6, 3.0],
+]
+const SPEED = 6
+const F = (t) => V(Math.sin(t * 0.6) * 0.4, Math.sin(t * 0.9) * 0.25, -(t - 8) * SPEED)
+const DOFF = [V(0, -1.15, -1.7), V(-1.0, -1.5, -0.5), V(1.0, -1.45, -0.6)]
+const sprite = (col, op = 1) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); scene.add(sp); return sp }
+function beam() { const grp = new THREE.Group()
+  ;[[0.014, '#ffffff', 1], [0.035, '#ff7fbf', 0.75], [0.09, MAG, 0.22]].forEach(([rad, col, op]) => grp.add(new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 1, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }))))
+  grp.userData.base = grp.children.map((m) => m.material.opacity); scene.add(grp); return grp }
+function aim(grp, a, b, k) { const d = new THREE.Vector3().subVectors(b, a), L = d.length(); grp.position.copy(a).addScaledVector(d, 0.5); grp.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); grp.scale.set(1 + (1 - k) * 2, L, 1 + (1 - k) * 2); grp.children.forEach((m, i) => (m.material.opacity = grp.userData.base[i] * k)); grp.visible = k > 0.01 }
+function burst(n, col, size) { const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), dirs = []; for (let i = 0; i < n; i++) { const u = rn(i * 3 + n) * 2 - 1, th = rn(i * 7 + n) * 6.283, q = Math.sqrt(1 - u * u); dirs.push(V(Math.cos(th) * q, u, Math.sin(th) * q).multiplyScalar(0.3 + rn(i * 11 + n) * 0.9)) }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3)); const pts = new THREE.Points(g, new THREE.PointsMaterial({ map: glow, color: col, size, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); pts.userData.dirs = dirs; scene.add(pts); return pts }
+function boom(pts, c, t0, t, speed) { const k = t - t0; pts.visible = k > 0 && k < 1.6; if (!pts.visible) return; const a = pts.geometry.attributes.position, e = 1 - Math.exp(-k * 3.2); pts.userData.dirs.forEach((d, i) => a.setXYZ(i, c.x + d.x * speed * e, c.y + d.y * speed * e, c.z + d.z * speed * e)); a.needsUpdate = true; pts.material.opacity = Math.pow(1 - k / 1.6, 1.5) }
+const ovc = document.getElementById('ov')
+function cardAt(x, y, title, sub, k, rot) { if (k <= 0) return; ov.save(); ov.globalAlpha = clamp(k * 3); const s = eBack(seg(k, 0, 0.35), 2.2) * 0.85; ov.translate(x, y); ov.scale(s, s); card(0, 0, title, sub, rot); ov.restore() }
+function rise(s, x, y, f, size, col, k, o = {}) { if (k <= 0) return; ov.save(); ov.beginPath(); ov.rect(-W, y - size * 0.98, W * 3, size * 1.25); ov.clip(); T(s, x, y + (1 - eExpo(k)) * size * 1.1, f, col, o); ov.restore() }
+function meta(l, r_, a = 1) { ov.save(); ov.globalAlpha = a * 0.8; T(l, 64, 104, `400 22px ${M}`, IVORY, { ls: 1 }); T(r_, W - 64, 104, `400 22px ${M}`, IVORY, { a: 'right', ls: 1 }); ov.restore() }
+const grain = [...Array(4)].map((_, n) => { const g = document.createElement('canvas'); g.width = g.height = 256; const x = g.getContext('2d'), id = x.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const v = rn(i * 0.37 + n * 991.3) * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255 } x.putImageData(id, 0, 0); return g })
+
+window.ready = (async () => {
+  await Promise.all([`700 100px ${G}`, `500 100px ${G}`, `400 20px ${M}`, '700 20px Inter', '500 20px Inter'].map((f) => document.fonts.load(f)))
+  const [rocks, drone, cb1, mother] = await Promise.all(['wandering_asteroids.glb', 'scifi_drone.glb', 'spaceship_-_cb1.glb', 'cool_alien_spaceship_by_jungle_jim.glb'].map(load))
+  // ===== céu realista: nebulosa procedural (filamentos + poeira escura), faixa galáctica, estrelas e planeta =====
+  scene.background = new THREE.Color('#020205')
+  const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: {},
+    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vDir;
+      float h(vec3 p){ p = fract(p*0.3183099+.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+      float n(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0-2.0*f);
+        return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x), mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y), mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x), mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y), f.z); }
+      float fbm(vec3 p){ float a = .5, s = 0.; for(int i=0;i<6;i++){ s += a*n(p); p = p*2.03 + 7.1; a *= .5; } return s; }
+      void main(){
+        vec3 d = normalize(vDir);
+        // nebulosa concentrada atrás dos asteroides, com distorção de domínio (filamentos)
+        vec3 c0 = normalize(vec3(-0.15, 0.35, -1.0));
+        float focus = smoothstep(0.35, 1.0, dot(d, c0));
+        vec3 q = d*3.2; vec3 w = vec3(fbm(q+1.7), fbm(q+9.2), fbm(q+4.4));
+        float neb = fbm(q*1.6 + w*2.4);
+        float fil = pow(clamp(neb*1.25-0.35, 0.0, 1.0), 2.2);
+        float dust = smoothstep(0.45, 0.75, fbm(q*2.4 + w*3.0 + 3.0));
+        vec3 col = mix(vec3(0.20,0.03,0.12), vec3(0.42,0.05,0.24), fil);           // magenta profundo
+        col = mix(col, vec3(0.10,0.06,0.30), smoothstep(0.4,0.8,w.x));            // violeta
+        col += vec3(0.02,0.12,0.13) * smoothstep(0.55,0.9,w.y) * fil;              // toque teal
+        vec3 nebula = col * fil * focus * (1.0 - dust*0.85) * 1.6;
+        // faixa galáctica (Via Láctea) em diagonal
+        vec3 bn = normalize(vec3(0.55, 0.8, 0.2));
+        float band = exp(-pow(dot(d, bn)/0.22, 2.0));
+        float bd = fbm(d*6.0+2.0);
+        vec3 milky = vec3(0.16,0.14,0.18) * band * smoothstep(0.35,0.75,bd) * (1.0 - smoothstep(0.5,0.8,fbm(d*9.0))*0.8);
+        gl_FragColor = vec4(nebula + milky, 1.0);
+      }` })
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(900, 64, 32), skyMat))
+  const rn = (k) => { const q = Math.sin(k * 127.1 + 311.7) * 43758.5453; return q - Math.floor(q) }
+  // estrelas: três camadas de tamanho/brilho, cores reais (azuladas, brancas, amareladas)
+  const starCols = ['#9bb0ff', '#cad7ff', '#ffffff', '#fff4e8', '#ffd2a1']
+  ;[[9000, 1.2, 0.55], [1800, 2.0, 0.9], [220, 3.2, 1.0]].forEach(([N, size, br], L) => {
+    const sp = [], sc = []
+    for (let i = 0; i < N; i++) { const k = i + L * 1e5, u = rn(k * 3.1) * 2 - 1, th = rn(k * 7.3) * Math.PI * 2, R = 800, qq = Math.sqrt(1 - u * u); sp.push(Math.cos(th) * qq * R, u * R, Math.sin(th) * qq * R); const cc = new THREE.Color(starCols[Math.floor(rn(k * 2.2) * 5)]).multiplyScalar(br * (0.35 + rn(k * 5.1) * 0.65)); sc.push(cc.r, cc.g, cc.b) }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3))
+    scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, depthWrite: false, toneMapped: false })))
+  })
+  // estrelas brilhantes com difração (cruz) — o "selo" de foto de telescópio
+  const spike = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d'); const g = x.createRadialGradient(128, 128, 0, 128, 128, 40); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 256, 256)
+    ;[[1, 0], [0, 1]].forEach(([a, b]) => { const lg = x.createLinearGradient(128 - a * 128, 128 - b * 128, 128 + a * 128, 128 + b * 128); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,.9)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = lg; if (a) x.fillRect(0, 126, 256, 4); else x.fillRect(126, 0, 4, 256) }); return new THREE.CanvasTexture(cv) })()
+  for (let i = 0; i < 14; i++) { const u = rn(i * 9.7) * 1.4 - 0.4, th = -Math.PI / 2 + (rn(i * 4.3) - 0.5) * 1.6, R = 600, qq = Math.sqrt(1 - u * u); const s2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: spike, color: starCols[i % 5], blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, transparent: true, opacity: 0.85 })); s2.position.set(Math.cos(th) * qq * R, u * R, Math.sin(th) * qq * R); s2.scale.setScalar(10 + rn(i * 3.3) * 18); scene.add(s2) }
+  // planeta gasoso com atmosfera (terminador iluminado pelo sol)
+  const pc = document.createElement('canvas'); pc.width = 2048; pc.height = 1024; const px = pc.getContext('2d')
+  for (let y = 0; y < 1024; y++) { const t = y / 1024, b = Math.sin(t * 40 + Math.sin(t * 9) * 3) * 0.5 + 0.5, b2 = Math.sin(t * 130) * 0.5 + 0.5; const r_ = 18 + b * 26 + b2 * 6, g_ = 12 + b * 12, bl = 30 + b * 34 + b2 * 10; px.fillStyle = `rgb(${r_|0},${g_|0},${bl|0})`; px.fillRect(0, y, 2048, 1) }
+  px.globalAlpha = 0.25; for (let i = 0; i < 400; i++) { px.fillStyle = rn(i) < 0.5 ? '#2a1640' : '#7a4a9a'; px.beginPath(); px.ellipse(rn(i * 3) * 2048, rn(i * 5) * 1024, 40 + rn(i * 7) * 220, 4 + rn(i * 11) * 10, 0, 0, 7); px.fill() }
+  const ptex = new THREE.CanvasTexture(pc); ptex.colorSpace = THREE.SRGBColorSpace
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(200, 128, 64), new THREE.MeshStandardMaterial({ map: ptex, color: '#6a6470', roughness: 0.95, metalness: 0 }))
+  planet.position.set(-260, -380, -620); planet.rotation.set(0.35, 0.6, 0.25); scene.add(planet)
+  const atm = new THREE.Mesh(new THREE.SphereGeometry(208, 96, 48), new THREE.ShaderMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
+    uniforms: { sun: { value: new THREE.Vector3(9, 6, 4).normalize() } },
+    vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN = normalize(mat3(modelMatrix)*normal); vec4 w = modelMatrix*vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform vec3 sun; varying vec3 vN; varying vec3 vW; void main(){ vec3 v = normalize(cameraPosition - vW); float rim = pow(1.0 - abs(dot(v, -vN)), 3.0); float lit = clamp(dot(-vN, sun)*0.7+0.4, 0.0, 1.0); gl_FragColor = vec4(vec3(0.45,0.35,1.0)*rim*lit*1.6, rim*lit); }` }))
+  atm.position.copy(planet.position); scene.add(atm)
+  // protótipos de asteroide (cada malha do modelo vira uma rocha reutilizável)
+  const protos = []; rocks.scene.updateMatrixWorld(true)
+  rocks.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z); g.computeBoundingSphere(); const k = 1 / g.boundingSphere.radius; g.scale(k, k, k); protos.push({ g, m: o.material }) } })
+  const rock = (i, size) => { const p = protos[i % protos.length]; const m = new THREE.Mesh(p.g, p.m); m.scale.setScalar(size); m.userData.ax = V(rn(i * 3) - 0.5, rn(i * 5) - 0.5, rn(i * 7) - 0.5).normalize(); m.userData.sp = 0.2 + rn(i * 9) * 0.6; scene.add(m); return m }
+  const tumble = (m, t) => m.quaternion.setFromAxisAngle(m.userData.ax, t * m.userData.sp + m.userData.ax.x * 5)
+  // cena 1: campo de asteroides vindo para a câmera
+  const LAB1 = ['PLANILHA_FINAL_v7.xlsx', 'BOLETO_038', '"oi, tem horário?"', 'NOTA FISCAL', 'RESPONDER CLIENTE', 'ESTOQUE', 'FOLLOW-UP']
+  const field1 = [...Array(30)].map((_, i) => { const m = rock(i, 0.8 + rn(i * 13) * 2.6); m.userData.p0 = V((rn(i * 17) - 0.5) * 30, (rn(i * 19) - 0.5) * 46, -18 - rn(i * 23) * 100); m.userData.label = i < LAB1.length ? LAB1[i] : null; if (i < LAB1.length) m.userData.p0.set((rn(i * 29) - 0.5) * 14, (rn(i * 31) - 0.4) * 22, -30 - i * 7); return m })
+  // cena 3/4: alvos, rochas de corredor e o chefão
+  const targets = HITS.map(([t0, lab, , , x, y], i) => { const m = rock(i + 40, 0.9 + rn(i * 37) * 0.5); m.userData.pos = V(x, y, F(t0).z - 22); m.userData.label = lab; m.userData.t0 = t0; return m })
+  const filler = [...Array(18)].map((_, i) => { const m = rock(i + 80, 0.6 + rn(i * 41) * 2.2); const side = i % 2 ? 1 : -1; m.userData.pos = V(side * (6 + rn(i * 43) * 9), (rn(i * 47) - 0.4) * 14, -10 - rn(i * 53) * 110); return m })
+  const bossT = 14.95, boss = rock(7, 6.5); boss.userData.pos = V(0, 3.2, F(bossT).z - 30)
+  // naves
+  const ms = fit(mother.scene, 10); magEyes(ms); ms.traverse((o) => { if (o.isMesh) [].concat(o.material).forEach((m) => { if (m.emissiveIntensity > 1) m.emissiveIntensity = 1.4 }) }); scene.add(ms)
+  const drones = [1.0, 0.82, 0.82].map((sz) => { const d = fit(SkeletonUtils.clone(drone.scene), sz); magEyes(d); scene.add(d); d.userData.engine = sprite(MAG, 0.9); d.userData.trail = [...Array(6)].map(() => sprite(MAG, 0.3)); return d })
+  const fighters = [0, 1].map(() => { const f = fit(SkeletonUtils.clone(cb1.scene), 3.0); magEyes(f); scene.add(f); f.userData.engine = sprite('#ff9fd0', 0.8); return f })
+  const beams = HITS.map(() => beam()), bossBeams = [beam(), beam(), beam()]
+  const flashes = HITS.map(() => sprite('#ffffff', 0)), bursts = HITS.map((_, i) => burst(260, '#ffb0d8', 0.22)), debris = HITS.map((_, i) => burst(60, '#c9bfc4', 0.35))
+  const bossFlash = sprite('#ffffff', 0), bossBurst = burst(900, '#ffb0d8', 0.45), bossDebris = burst(220, '#d8cfd4', 0.6)
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 12, 160), new THREE.MeshBasicMaterial({ color: new THREE.Color(MAG).multiplyScalar(2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); scene.add(ring)
+  const muzzle = (d) => d.position.clone().add(V(0, 0.35, -0.6))
+
+  window.render = (t) => {
+    const shot = SHOTS.findIndex((s, i) => t >= s && t < SHOTS[i + 1]); const S = shot < 0 ? 4 : shot
+    ;[...field1, ...targets, ...filler, boss, ms, ...drones, ...fighters, ...beams, ...bossBeams, ...flashes, ...bursts, ...debris, bossFlash, bossBurst, bossDebris, ring].forEach((o) => (o.visible = false))
+    drones.forEach((d) => { d.userData.engine.visible = false; d.userData.trail.forEach((s) => (s.visible = false)) }); fighters.forEach((f) => (f.userData.engine.visible = false))
+    const labels = []
+    const placeDrone = (d, p, look, i, tt) => { d.visible = true; d.position.copy(p); d.lookAt(look); d.rotateY(Math.PI); d.rotateZ(Math.sin(tt * 2 + i) * 0.12)
+      const back = new THREE.Vector3().subVectors(p, look).normalize(); d.userData.engine.visible = true; d.userData.engine.position.copy(p).addScaledVector(back, -0.35); d.userData.engine.scale.setScalar(0.45 + Math.sin(tt * 40 + i) * 0.06); d.userData.engine.material.opacity = 0.55
+      d.userData.trail.forEach((s, k) => { s.visible = true; s.position.copy(p).addScaledVector(back, -0.6 - k * 0.5); s.scale.setScalar(0.4 - k * 0.05); s.material.opacity = 0.22 - k * 0.035 }) }
+    const flyFighter = (f, a, b, k) => { if (k <= 0 || k >= 1) return; f.visible = true; const p = new THREE.Vector3().lerpVectors(a, b, k); f.position.copy(p); f.lookAt(b); f.rotateZ(-0.5); f.userData.engine.visible = true; f.userData.engine.position.copy(p).addScaledVector(new THREE.Vector3().subVectors(a, b).normalize(), 1.7); f.userData.engine.scale.setScalar(1.6) }
+    if (S === 0) {
+      field1.forEach((m) => { m.visible = true; m.position.copy(m.userData.p0).add(V(0, 0, t * 9)); tumble(m, t); if (m.userData.label && m.position.z < 12) labels.push([m.position.clone(), m.userData.label, m.scale.x]) })
+      cam.position.set(Math.sin(t * 1.3) * 0.2, Math.cos(t * 1.1) * 0.15, 20); cam.lookAt(0, 0, -30); cam.rotateZ(Math.sin(t * 0.4) * 0.04)
+    } else if (S === 1) {
+      const u = t - 5; ms.visible = true; ms.position.set(0, 0, 0); ms.rotation.set(0.1, 0.6 + u * 0.06, 0)
+      cam.position.set(lerp(15, 11, eIO(u / 3)), lerp(3.5, 2, eIO(u / 3)), lerp(17, 13, eIO(u / 3))); cam.lookAt(0, -0.8, 0)
+      drones.forEach((d, i) => { const t0 = 5.3 + i * 0.35, k = seg(t, t0, 1.6); if (k <= 0) return; const a = V(-1.2 + i * 1.2, -2.6, 0.5), b = V(13 + i * 1.5, 2.5 - i, 22); const p = new THREE.Vector3().lerpVectors(a, b, eIn(k)); placeDrone(d, p, b, i, t) })
+      flyFighter(fighters[0], V(-40, 5, 4), V(40, 3, 2), seg(t, 6.3, 1.3))
+      filler.slice(0, 8).forEach((m, i) => { m.visible = true; m.position.set(-20 + i * 6, -8 + rn(i) * 16, -30 - rn(i * 3) * 30); tumble(m, t) })
+    } else {
+      // perseguição (3) e chefão (4)
+      const f = F(t)
+      drones.forEach((d, i) => { const p = f.clone().add(DOFF[i]).add(V(Math.sin(t * 1.7 + i * 2) * 0.25, Math.cos(t * 1.3 + i) * 0.18, 0)); placeDrone(d, p, p.clone().add(V(0, 0.3, -10)), i, t) })
+      const shake = S === 3 ? Math.max(0, 1 - Math.abs(t - 15.0) * 2.5) * 0.35 : 0
+      cam.position.copy(f).add(V(rn(Math.floor(t * 60)) * shake - shake / 2, 0.2 + rn(Math.floor(t * 60) + 5) * shake - shake / 2, 4.6)); cam.lookAt(f.clone().add(V(0.3, 1.8, -20)))
+      filler.forEach((m) => { m.visible = true; m.position.copy(m.userData.pos); tumble(m, t) })
+      targets.forEach((m, i) => { const [t0, lab, title, sub] = HITS[i]; if (t < t0) { m.visible = true; m.position.copy(m.userData.pos); tumble(m, t); if (m.position.z < f.z + 2) labels.push([m.position.clone(), lab, m.scale.x, t0 - t < 0.8]) }
+        const d = drones[i % 3], kb = t < t0 ? seg(t, t0 - 0.2, 0.2) : 1 - seg(t, t0, 0.15); if (kb > 0) aim(beams[i], muzzle(d), m.userData.pos, kb)
+        const kf = t - t0; if (kf > 0 && kf < 0.8) { flashes[i].visible = true; flashes[i].position.copy(m.userData.pos); flashes[i].scale.setScalar(1 + eOut(kf / 0.3) * 3); flashes[i].material.opacity = 1 - kf / 0.8 }
+        boom(bursts[i], m.userData.pos, t0, t, 4); boom(debris[i], m.userData.pos, t0, t, 2.2) })
+      fighters[1] && flyFighter(fighters[1], f.clone().add(V(-30, 7, -14)), f.clone().add(V(30, 5, -10)), seg(t, 10.2, 1.2))
+      if (t < bossT + 0.02) { boss.visible = S === 3 || t > 13.2; boss.position.copy(boss.userData.pos); tumble(boss, t * 0.5); if (boss.visible) labels.push([boss.position.clone(), 'PLANILHA_FINAL_v7.xlsx', 4, t > 14.1]) }
+      bossBeams.forEach((b, i) => { const kb = t < bossT ? seg(t, bossT - 0.25, 0.25) : 1 - seg(t, bossT + 0.1, 0.25); if (kb > 0) aim(b, muzzle(drones[i]), boss.userData.pos, kb) })
+      const kf = t - bossT; if (kf > 0 && kf < 1.4) { bossFlash.visible = true; bossFlash.position.copy(boss.userData.pos); bossFlash.scale.setScalar(4 + eOut(kf / 0.4) * 34); bossFlash.material.opacity = 1 - kf / 1.4
+        ring.visible = true; ring.position.copy(boss.userData.pos); ring.lookAt(cam.position); ring.scale.setScalar(1 + eOut(kf / 1.2) * 30); ring.material.opacity = 1 - kf / 1.4 }
+      boom(bossBurst, boss.userData.pos, bossT, t, 16); boom(bossDebris, boss.userData.pos, bossT, t, 9)
+    }
+    if (S === 4) {
+      const u = t - 16; [...filler, ...targets, boss, ...beams, ...bossBeams, ...flashes, ...bursts, ...debris, bossFlash, bossBurst, bossDebris, ring, ...fighters].forEach((o) => (o.visible = false))
+      const c0 = V(0, 0.6, 0); drones.forEach((d, i) => { const a = u * 0.6 + (i * Math.PI * 2) / 3, orb = (q) => c0.clone().add(V(Math.cos(q) * 3.6, Math.sin(q) * 0.9, Math.sin(q) * 2.4)); placeDrone(d, orb(a), orb(a + 0.2), i, t); d.scale.multiplyScalar(1) })
+      ms.visible = true; ms.position.set(-9, 6, -38); ms.rotation.set(0.1, 1.0 + u * 0.03, 0)
+      cam.position.set(Math.sin(u * 0.08) * 1.5, 0.9 - u * 0.04, lerp(11.5, 10, eIO(u / 7))); cam.lookAt(0, 0.2, 0)
+    }
+    cam.updateMatrixWorld(); composer.render()
+    // ---------- 2D ----------
+    ov.setTransform(1, 0, 0, 1, 0, 0); ov.clearRect(0, 0, W, H); ov.globalAlpha = 1
+    const topShade = (h, a) => { const g = ov.createLinearGradient(0, 0, 0, h); g.addColorStop(0, `rgba(4,3,8,${a})`); g.addColorStop(1, 'rgba(4,3,8,0)'); ov.fillStyle = g; ov.fillRect(0, 0, W, h) }
+    labels.forEach(([p, lab, sz, locked]) => { const v = p.clone().project(cam); if (v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return; const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H, R = clamp(sz * 900 / Math.max(2, cam.position.distanceTo(p)), 30, 220); if (locked) lock(x, y, R); tag(x + R * 0.6, y - R * 0.9, lab + (locked ? ' · LOCKED' : '')) })
+    if (S === 0) {
+      topShade(760, 0.75)
+      const pulse = 0.5 + 0.5 * Math.sin(t * 9); ov.save(); ov.strokeStyle = `rgba(226,64,143,${0.25 + pulse * 0.35})`; ov.lineWidth = 14; ov.strokeRect(0, 0, W, H); ov.restore()
+      meta('(01) ALERTA', 'ASTROVIA · SISTEMA DE DEFESA')
+      rise('O TRABALHO', 64, 330, `700 128px ${G}`, 128, IVORY, seg(t, 0.35, 0.5), { ls: -6 })
+      rise('REPETITIVO', 64, 450, `700 128px ${G}`, 128, IVORY, seg(t, 1.0, 0.5), { ls: -6, stroke: 2.5 })
+      rise('ESTÁ INVADINDO.', 64, 570, `700 112px ${G}`, 112, MAG, seg(t, 2.2, 0.5), { ls: -5 })
+      rise('o seu negócio.', 70, 640, `400 34px ${M}`, 34, IVORY, seg(t, 3.2, 0.4), { ls: 1 })
+      const n = Math.round(1284 * eIO(seg(t, 0.4, 4.2))); ov.save(); ov.fillStyle = 'rgba(226,64,143,.16)'; ov.beginPath(); ov.roundRect(64, 1764, 600, 64, 10); ov.fill(); ov.strokeStyle = MAG; ov.lineWidth = 2; ov.stroke(); ov.restore()
+      if (Math.floor(t * 4) % 2 === 0) { ov.fillStyle = MAG; ov.beginPath(); ov.arc(98, 1796, 9, 0, 7); ov.fill() }
+      T(`AMEAÇAS DETECTADAS: ${n.toLocaleString('pt-BR')}`, 122, 1806, `400 26px ${M}`, IVORY, { ls: 2 })
+    } else if (S === 1) {
+      topShade(600, 0.6); const u = t - 5
+      meta('(02) ATIVANDO AGENTES', 'MODO AUTÔNOMO ●')
+      rise('AGENTES', 64, 330, `700 140px ${G}`, 140, IVORY, seg(u, 0.25, 0.5), { ls: -6 })
+      rise('ASTROVIA', 64, 460, `700 140px ${G}`, 140, MAG, seg(u, 0.55, 0.5), { ls: -6 })
+      const txt = '> deploy agentes --modo=autonomo', nch = Math.floor(clamp((u - 0.9) / 1.2) * txt.length); T(txt.slice(0, nch) + (Math.floor(t * 4) % 2 ? '▌' : ''), 70, 540, `400 28px ${M}`, '#B9B4C0')
+    } else if (S === 2 || S === 3) {
+      topShade(420, 0.7)
+      meta(S === 2 ? '(03) EM COMBATE' : '(04) ALVO PRINCIPAL', 'AGENTES 01 · 02 · 03')
+      const n = Math.round(1284 * (1 - eIO(seg(t, 8.3, 6.7)))); T(n.toLocaleString('pt-BR'), 64, 290, `700 150px ${G}`, n === 0 ? MAG : IVORY, { ls: -8 })
+      T('tarefas restantes', 70, 350, `400 28px ${M}`, '#B9B4C0')
+      HITS.forEach(([t0, , title, sub], i) => { const k = t - t0 - 0.05; if (k < 0 || k > 1.6) return; const v = targets[i].userData.pos.clone().project(cam); const x = clamp((v.x + 1) / 2 * W, 260, W - 260), y = clamp((1 - v.y) / 2 * H, 520, 1500) - eOut(k / 1.6) * 60; ov.save(); ov.globalAlpha = 1 - seg(k, 1.2, 0.4); cardAt(x, y, title, sub, k, (i % 2 ? 1 : -1) * 0.04); ov.restore() })
+      const fk = t - 14.97; if (fk > 0 && fk < 0.3) { ov.fillStyle = `rgba(255,235,245,${(1 - fk / 0.3) * 0.85})`; ov.fillRect(0, 0, W, H) }
+      if (t > 15.2) { const k = seg(t, 15.2, 0.4); ov.save(); ov.globalAlpha = k; ov.translate(W / 2, 960); ov.scale(eBack(k, 2), eBack(k, 2)); card(0, 0, 'Missão cumprida', '1.284 tarefas · 0 pessoas cansadas', 0); ov.restore() }
+    } else {
+      const u = t - 16; topShade(1300, 0.55)
+      meta('(05) MISSÃO CUMPRIDA', 'ASTROVIA SOLUTIONS')
+      rise('ASTROVIA', W / 2, 470, `700 190px ${G}`, 190, IVORY, seg(t, 16.35, 0.55), { a: 'center', ls: -10 })
+      rise('Automação & IA', 64, 1180, `700 96px ${G}`, 96, IVORY, seg(t, 17.75, 0.5), { ls: -4 })
+      rise('que trabalha', 64, 1280, `700 96px ${G}`, 96, IVORY, seg(t, 19.85, 0.45), { ls: -4, stroke: 2.5 })
+      rise('enquanto você vive.', 64, 1380, `700 96px ${G}`, 96, MAG, seg(t, 20.55, 0.45), { ls: -4 })
+      const lk = seg(t, 21.3, 0.6); if (lk > 0) { ov.fillStyle = IVORY; ov.fillRect(64, 1500, (W - 128) * eExpo(lk), 2) }
+      rise('Conheça nosso trabalho ↗', 64, 1580, `500 46px ${G}`, 46, IVORY, seg(t, 21.5, 0.5))
+      rise('astrovia-solutions.vercel.app', 64, 1636, `400 26px ${M}`, 26, '#B9B4C0', seg(t, 21.8, 0.5))
+    }
+    // cortes com respiro de luz
+    const cut = SHOTS.slice(1, 5).map((s) => t - s).find((d) => d >= 0 && d < 0.12); if (cut !== undefined) { ov.fillStyle = `rgba(255,240,248,${(1 - cut / 0.12) * 0.35})`; ov.fillRect(0, 0, W, H) }
+    out.globalAlpha = 1; out.globalCompositeOperation = 'source-over'; out.drawImage(glc, 0, 0); out.drawImage(ovc, 0, 0)
+    out.save(); out.globalAlpha = 0.05; out.globalCompositeOperation = 'overlay'; out.fillStyle = out.createPattern(grain[Math.floor(t * FPS) % 4], 'repeat'); out.fillRect(0, 0, W, H); out.restore()
+    const vg = out.createRadialGradient(W / 2, 960, 650, W / 2, 960, 1300); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)'); out.fillStyle = vg; out.fillRect(0, 0, W, H)
+  }
+  window.TOTAL = TOTAL; window.FPS = FPS
+  window.render(0); return true
+})()
+</script></body></html>

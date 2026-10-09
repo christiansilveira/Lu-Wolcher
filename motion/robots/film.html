@@ -69,7 +69,7 @@ const HITS = [
 ]
 const SPEED = 6
 const F = (t) => V(Math.sin(t * 0.6) * 0.4, Math.sin(t * 0.9) * 0.25, -(t - 8) * SPEED)
-const DOFF = [V(0, -1.15, -1.7), V(-1.0, -1.5, -0.5), V(1.0, -1.45, -0.6)]
+const DOFF = [V(0, -0.85, -2.6), V(-0.85, -1.05, -1.4), V(0.85, -1.0, -1.5)]
 const sprite = (col, op = 1) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); scene.add(sp); return sp }
 function beam() { const grp = new THREE.Group()
   ;[[0.014, '#ffffff', 1], [0.035, '#ff7fbf', 0.75], [0.09, MAG, 0.22]].forEach(([rad, col, op]) => grp.add(new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 1, 12, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(1.6), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }))))
@@ -86,7 +86,7 @@ const grain = [...Array(4)].map((_, n) => { const g = document.createElement('ca
 
 window.ready = (async () => {
   await Promise.all([`700 100px ${G}`, `500 100px ${G}`, `400 20px ${M}`, '700 20px Inter', '500 20px Inter'].map((f) => document.fonts.load(f)))
-  const [rocks, drone, cb1, mother] = await Promise.all(['wandering_asteroids.glb', 'scifi_drone.glb', 'spaceship_-_cb1.glb', 'cool_alien_spaceship_by_jungle_jim.glb'].map(load))
+  const [rocks, drone, cb1, mother, moons] = await Promise.all(['wandering_asteroids.glb', 'scifi_drone.glb', 'spaceship_-_cb1.glb', 'cool_alien_spaceship_by_jungle_jim.glb', 'deep_space_skybox.glb'].map(load))
   // ===== céu realista: nebulosa procedural (filamentos + poeira escura), faixa galáctica, estrelas e planeta =====
   scene.background = new THREE.Color('#020205')
   const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: {},
@@ -142,6 +142,14 @@ window.ready = (async () => {
     vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN = normalize(mat3(modelMatrix)*normal); vec4 w = modelMatrix*vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
     fragmentShader: `uniform vec3 sun; varying vec3 vN; varying vec3 vW; void main(){ vec3 v = normalize(cameraPosition - vW); float rim = pow(1.0 - abs(dot(v, -vN)), 3.0); float lit = clamp(dot(-vN, sun)*0.7+0.4, 0.0, 1.0); gl_FragColor = vec4(vec3(0.45,0.35,1.0)*rim*lit*1.6, rim*lit); }` }))
   atm.position.copy(planet.position); scene.add(atm)
+  // planetas realistas (luas rochosas com relevo) no lugar do planeta procedural
+  planet.visible = false; atm.visible = false
+  const moonMeshes = []; moons.scene.updateMatrixWorld(true); moons.scene.traverse((o) => { if (o.isMesh && !/Sphere_Material/.test(o.name)) moonMeshes.push(o) })
+  const moon = (i, size, pos, rot) => { const o = moonMeshes[i % moonMeshes.length], g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingSphere(); const c = g.boundingSphere.center; g.translate(-c.x, -c.y, -c.z); const k = size / g.boundingSphere.radius; g.scale(k, k, k)
+    const mat = o.material.clone(); mat.roughness = 0.95; mat.metalness = 0; if (mat.normalScale) mat.normalScale.set(1.6, 1.6); const m = new THREE.Mesh(g, mat); m.position.copy(pos); m.rotation.set(...rot); scene.add(m); return m }
+  const moonA = moon(0, 210, new THREE.Vector3(-250, -360, -620), [0.4, 0.8, 0.2])
+  const moonB = moon(1, 26, new THREE.Vector3(170, 120, -520), [0.2, 1.4, 0])
+  const moonC = moon(2, 9, new THREE.Vector3(120, 150, -470), [1.0, 0.3, 0.5])
   // protótipos de asteroide (cada malha do modelo vira uma rocha reutilizável)
   const protos = []; rocks.scene.updateMatrixWorld(true)
   rocks.scene.traverse((o) => { if (o.isMesh) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); g.translate(-c.x, -c.y, -c.z); g.computeBoundingSphere(); const k = 1 / g.boundingSphere.radius; g.scale(k, k, k); protos.push({ g, m: o.material }) } })

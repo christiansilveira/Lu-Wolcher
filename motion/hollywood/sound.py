@@ -16,7 +16,7 @@ rng = np.random.default_rng(11)
 L = np.zeros(N)
 R = np.zeros(N)
 
-HITS = [10.15, 11.13, 12.4, 13.1]
+HITS = [10.04, 11.04, 12.2, 13.1]
 BOOM = 15.6
 CUTS = [4.6, 7.6, 9.4, 11.0, 11.9, 14.0]
 

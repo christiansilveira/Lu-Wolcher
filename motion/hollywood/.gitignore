@@ -1,0 +1,10 @@
+src/
+seq/
+up/
+plate/
+models/
+*.mp4
+*.wav
+*.png
+*.jpg
+plate_tmp/

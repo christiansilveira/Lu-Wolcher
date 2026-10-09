@@ -1,0 +1,126 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Astrovia — Agentes (Hollywood)</title>
+<style>
+@font-face{font-family:"Space Grotesk";font-weight:500;src:url(../fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:700;src:url(../fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Mono";font-weight:400;src:url(../fonts/space-mono-latin-400-normal.woff2) format("woff2")}
+*{margin:0}html,body{width:1080px;height:1920px;overflow:hidden;background:#000}canvas{display:block;position:absolute;left:0;top:0}#hl,#st{visibility:hidden}
+</style></head><body>
+<canvas id="hl" width="270" height="480"></canvas><canvas id="st" width="34" height="480"></canvas><canvas id="out" width="1080" height="1920"></canvas>
+<script>
+/* Filme "Agentes Astrovia" — placas geradas no Grok (upscale IA) + grade, halation, tremores, HUD e tipografia */
+const W = 1080, H = 1920, FPS = 24, TOTAL = 24
+const PLATE = new URLSearchParams(location.search).get('p') || 'plate'
+const MAG = '#E2408F', IVORY = '#EFEBE4', G = '"Space Grotesk"', M = '"Space Mono"'
+const out = document.getElementById('out').getContext('2d'), hlc = document.getElementById('hl'), hl = hlc.getContext('2d'), stc = document.getElementById('st'), st = stc.getContext('2d')
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), lerp = (a, b, k) => a + (b - a) * k, seg = (u, a, d) => clamp((u - a) / d)
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3), eIO = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2 }
+const eExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * clamp(x))), eBack = (x, k = 1.7) => { x = clamp(x); return 1 + (k + 1) * Math.pow(x - 1, 3) + k * Math.pow(x - 1, 2) }
+const rn = (k) => { const q = Math.sin(k * 127.1 + 311.7) * 43758.5453; return q - Math.floor(q) }
+
+// plano: [início, fim, pasta, quadros, zoom0, zoom1, foco x/y, filtro de cor]
+const SHOTS = [
+  [0.0, 4.6, 's1', 110, 1.0, 1.16, [0.42, 0.47], 'contrast(1.12) saturate(1.05) brightness(1.02)'],
+  [4.6, 7.6, 's2', 72, 1.02, 1.1, [0.5, 0.5], 'contrast(1.1) saturate(1.08)'],
+  [7.6, 9.4, 's3', 43, 1.0, 1.06, [0.5, 0.55], 'contrast(1.1) saturate(1.1)'],
+  [9.4, 11.0, 's4a', 38, 1.04, 1.1, [0.5, 0.5], 'contrast(1.1) saturate(1.12)'],
+  [11.0, 11.9, 's4b', 22, 1.1, 1.22, [0.45, 0.48], 'hue-rotate(-62deg) contrast(1.12) saturate(1.2)'],
+  [11.9, 14.0, 's4c', 50, 1.04, 1.1, [0.6, 0.5], 'contrast(1.1) saturate(1.12)'],
+  [14.0, 15.25, 's5a', 30, 1.0, 1.08, [0.5, 0.32], 'contrast(1.1) saturate(1.1)'],
+  [15.25, 16.4, 's5b', 28, 1.08, 1.0, [0.5, 0.35], 'contrast(1.08) saturate(1.05)'],
+  [16.4, 24.0, 's6', 182, 1.12, 1.0, [0.6, 0.45], 'contrast(1.1) saturate(1.05) brightness(0.98)'],
+]
+// impactos (tremor + flash) e alvos: [t, rótulo, título do card, sub, x, y]
+const HITS = [
+  [10.15, 'NOTA FISCAL', 'Nota emitida', 'NF 1.284 · enviada por e-mail', 0.5, 0.47],
+  [11.13, '"oi, tem horário?"', 'Respondido em 3s', 'cliente agendado às 15h', 0.45, 0.48],
+  [12.4, 'BOLETO_038', 'Boleto conciliado', 'R$ 1.250,00 · baixa automática', 0.8, 0.5],
+  [13.1, 'FOLLOW-UP', 'Follow-up enviado', '12 clientes · WhatsApp', 0.78, 0.52],
+]
+const BOOM = 15.6
+const SHAKES = [...HITS.map((h) => [h[0], 16]), [BOOM, 46], [16.4, 22], [4.6, 10]]
+
+const cache = new Map()
+const img = (src) => { if (!cache.has(src)) cache.set(src, new Promise((r) => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src })); return cache.get(src) }
+function T(s, x, y, f, col, o = {}) { out.save(); out.font = f; out.fillStyle = col; out.textAlign = o.a || 'left'; out.letterSpacing = (o.ls || 0) + 'px'; if (o.shadow) { out.shadowColor = 'rgba(0,0,0,.55)'; out.shadowBlur = o.shadow } if (o.stroke) { out.strokeStyle = col; out.lineWidth = o.stroke; out.strokeText(s, x, y) } else out.fillText(s, x, y); out.restore() }
+function rise(s, x, y, f, size, col, k, o = {}) { if (k <= 0) return; out.save(); out.beginPath(); out.rect(-W, y - size * 0.98, W * 3, size * 1.25); out.clip(); T(s, x, y + (1 - eExpo(k)) * size * 1.1, f, col, o); out.restore() }
+function meta(l, r, a = 1) { out.save(); out.globalAlpha = a * 0.85; T(l, 64, 104, `400 22px ${M}`, IVORY, { ls: 1 }); T(r, W - 64, 104, `400 22px ${M}`, IVORY, { a: 'right', ls: 1 }); out.fillStyle = 'rgba(239,235,228,.35)'; out.fillRect(64, 128, W - 128, 1); out.restore() }
+function tag(x, y, label) { const f = `400 22px ${M}`; out.font = f; out.letterSpacing = '1px'; const w = out.measureText(label).width + 28; x = clamp(x, 24, W - 24 - w); out.save(); out.fillStyle = 'rgba(11,10,13,.82)'; out.beginPath(); out.roundRect(x, y - 26, w, 40, 8); out.fill(); out.strokeStyle = MAG; out.lineWidth = 2; out.stroke(); out.restore(); T(label, x + 14, y + 2, f, IVORY, { ls: 1 }) }
+function lock(x, y, R, k = 1) { out.save(); out.globalAlpha = clamp(k * 2); out.strokeStyle = MAG; out.lineWidth = 3; out.shadowColor = MAG; out.shadowBlur = 14; R *= lerp(1.6, 1, eOut(k)); const L = R * 0.42; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => { out.beginPath(); out.moveTo(x + sx * R, y + sy * (R - L)); out.lineTo(x + sx * R, y + sy * R); out.lineTo(x + sx * (R - L), y + sy * R); out.stroke() }); out.beginPath(); out.arc(x, y, 4, 0, 7); out.fillStyle = MAG; out.fill(); out.restore() }
+function card(x, y, title, sub, rot) { out.save(); out.translate(x, y); out.rotate(rot); out.shadowColor = 'rgba(226,64,143,.6)'; out.shadowBlur = 50; out.fillStyle = '#fff'; out.beginPath(); out.roundRect(-220, -58, 440, 116, 28); out.fill(); out.shadowBlur = 0; out.fillStyle = '#1F9D5A'; out.beginPath(); out.arc(-158, 0, 32, 0, 7); out.fill(); T('✓', -158, 11, `700 32px ${G}`, '#fff', { a: 'center' }); T(title, -110, -6, `700 30px ${G}`, '#0B0A0D'); T(sub, -110, 27, `500 21px ${G}`, '#6E6A78'); out.restore() }
+function cardAt(x, y, title, sub, k, rot) { if (k <= 0) return; out.save(); out.globalAlpha = clamp(k * 3); const s = eBack(seg(k, 0, 0.35), 2.2) * 0.85; out.translate(x, y); out.scale(s, s); card(0, 0, title, sub, rot); out.restore() }
+const shade = (y0, y1, a, top = true) => { const g = out.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, `rgba(3,2,6,${top ? a : 0})`); g.addColorStop(1, `rgba(3,2,6,${top ? 0 : a})`); out.fillStyle = g; out.fillRect(0, y0, W, y1 - y0) }
+const grain = [...Array(4)].map((_, n) => { const g = document.createElement('canvas'); g.width = g.height = 256; const x = g.getContext('2d'), id = x.createImageData(256, 256); for (let i = 0; i < id.data.length; i += 4) { const v = rn(i * 0.37 + n * 991.3) * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255 } x.putImageData(id, 0, 0); return g })
+
+window.ready = Promise.all([`700 100px ${G}`, `500 100px ${G}`, `400 20px ${M}`].map((f) => document.fonts.load(f)))
+window.render = async (t) => {
+  const si = Math.max(0, SHOTS.findIndex(([a, b]) => t >= a && t < b) === -1 ? SHOTS.length - 1 : SHOTS.findIndex(([a, b]) => t >= a && t < b))
+  const [a, b, dir, n, z0, z1, [fx, fy], filt] = SHOTS[si], u = (t - a) / (b - a)
+  const fr = clamp(Math.floor((t - a) * FPS + 1e-6) + 1, 1, n), im = await img(`${PLATE}/${dir}/${String(fr).padStart(4, '0')}.jpg`)
+  // tremor de câmera (decai) nos impactos
+  let sx = 0, sy = 0, sr = 0; SHAKES.forEach(([t0, amp]) => { const k = t - t0; if (k >= 0 && k < 0.45) { const e = amp * Math.pow(1 - k / 0.45, 2), q = Math.floor(t * FPS); sx += (rn(q * 1.7) - 0.5) * 2 * e; sy += (rn(q * 3.1) - 0.5) * 2 * e; sr += (rn(q * 5.3) - 0.5) * e * 0.0009 } })
+  const z = lerp(z0, z1, eIO(u)) * (1 + Math.hypot(sx, sy) / 900)
+  out.setTransform(1, 0, 0, 1, 0, 0); out.globalAlpha = 1; out.globalCompositeOperation = 'source-over'; out.fillStyle = '#000'; out.fillRect(0, 0, W, H)
+  out.save(); out.translate(W * fx + sx, H * fy + sy); out.rotate(sr); out.scale(z, z); out.translate(-W * fx, -H * fy); out.filter = filt; if (im) out.drawImage(im, 0, 0, W, H); out.restore(); out.filter = 'none'
+  // halation + flare anamórfico a partir das altas luzes
+  hl.filter = 'brightness(0.55) contrast(3.2) saturate(1.3)'; hl.clearRect(0, 0, 270, 480); hl.drawImage(out.canvas, 0, 0, 270, 480); hl.filter = 'none'
+  out.save(); out.globalCompositeOperation = 'screen'; out.globalAlpha = 0.5; out.filter = 'blur(6px)'; out.drawImage(hlc, 0, 0, W, H); out.globalAlpha = 0.35; out.filter = 'blur(26px)'; out.drawImage(hlc, 0, 0, W, H); out.restore(); out.filter = 'none'
+  st.clearRect(0, 0, 34, 480); st.filter = 'blur(2px)'; st.drawImage(hlc, 0, 0, 34, 480); st.filter = 'none'
+  out.save(); out.globalCompositeOperation = 'screen'; out.globalAlpha = 0.28; out.filter = 'blur(3px) hue-rotate(-25deg)'; out.drawImage(stc, -W * 0.1, 0, W * 1.2, H); out.restore(); out.filter = 'none'
+
+  // ---------- HUD e tipografia ----------
+  if (si === 0) {
+    shade(0, 820, 0.85)
+    const pulse = 0.5 + 0.5 * Math.sin(t * 9); out.save(); out.strokeStyle = `rgba(226,64,143,${0.18 + pulse * 0.3})`; out.lineWidth = 12; out.strokeRect(0, 0, W, H); out.restore()
+    meta('(01) ALERTA', 'ASTROVIA · SISTEMA DE DEFESA')
+    rise('O TRABALHO', 64, 330, `700 128px ${G}`, 128, IVORY, seg(t, 0.35, 0.5), { ls: -6 })
+    rise('REPETITIVO', 64, 450, `700 128px ${G}`, 128, IVORY, seg(t, 1.0, 0.5), { ls: -6, stroke: 2.5 })
+    rise('ESTÁ INVADINDO.', 64, 570, `700 112px ${G}`, 112, MAG, seg(t, 2.55, 0.5), { ls: -5 })
+    rise('o seu negócio.', 70, 640, `400 34px ${M}`, 34, IVORY, seg(t, 3.45, 0.4), { ls: 1 })
+    const lk = seg(t, 1.5, 0.5); if (lk > 0) { const x = W * 0.45, y = H * 0.48; lock(x, y, 280, lk); tag(x - 280, y - 310, 'PLANILHA_FINAL_v7.xlsx' + (t > 3.0 ? ' · AMEAÇA' : '')) }
+    const nn = Math.round(1284 * eIO(seg(t, 0.4, 4.0))); out.save(); out.fillStyle = 'rgba(226,64,143,.16)'; out.beginPath(); out.roundRect(64, 1764, 620, 64, 10); out.fill(); out.strokeStyle = MAG; out.lineWidth = 2; out.stroke(); out.restore()
+    if (Math.floor(t * 4) % 2 === 0) { out.fillStyle = MAG; out.beginPath(); out.arc(98, 1796, 9, 0, 7); out.fill() }
+    T(`AMEAÇAS DETECTADAS: ${nn.toLocaleString('pt-BR')}`, 122, 1806, `400 26px ${M}`, IVORY, { ls: 2 })
+  } else if (si <= 2) {
+    shade(0, 640, 0.75)
+    meta(si === 1 ? '(02) ATIVANDO AGENTES' : '(03) DECOLAGEM', 'MODO AUTÔNOMO ●')
+    if (si === 1) {
+      rise('AGENTES', 64, 330, `700 140px ${G}`, 140, IVORY, seg(t, 4.85, 0.5), { ls: -6 })
+      rise('ASTROVIA', 64, 460, `700 140px ${G}`, 140, MAG, seg(t, 5.15, 0.5), { ls: -6 })
+    }
+    const txt = si === 1 ? '> deploy agentes --modo=autonomo' : '> agentes online: 03/03  ✓', t0 = si === 1 ? 5.6 : 7.75
+    const nch = Math.floor(clamp((t - t0) / 1.1) * txt.length); T(txt.slice(0, nch) + (Math.floor(t * 4) % 2 ? '▌' : ''), 70, si === 1 ? 540 : 330, `400 30px ${M}`, '#CFC9D6')
+    if (si === 2) rise('24h. Sem pausa.', 64, 250, `700 92px ${G}`, 92, IVORY, seg(t, 7.7, 0.45), { ls: -4 })
+  } else if (si <= 7) {
+    shade(0, 460, 0.8)
+    meta(si < 6 ? '(04) EM COMBATE' : '(05) ALVO PRINCIPAL', 'AGENTES 01 · 02 · 03')
+    const left = Math.round(1284 * (1 - eIO(seg(t, 9.6, BOOM - 9.6)))); T(left.toLocaleString('pt-BR'), 64, 290, `700 150px ${G}`, left === 0 ? MAG : IVORY, { ls: -8, shadow: 30 })
+    if (t <= BOOM) T('tarefas restantes', 70, 350, `400 28px ${M}`, '#CFC9D6')
+    HITS.forEach(([t0, lab, title, sub, x, y], i) => {
+      const k = t0 - t; if (k > 0 && k < 0.75 && t >= SHOTS[si][0]) { lock(W * x, H * y, 110, 1 - k / 0.75); tag(W * x - 110, H * y - 140, lab + (k < 0.35 ? ' · LOCKED' : '')) }
+      const c = t - t0 - 0.06; if (c > 0 && c < 1.5) { out.save(); out.globalAlpha = 1 - seg(c, 1.1, 0.4); cardAt(clamp(W * x, 260, W - 260), clamp(H * y + 300, 900, 1560) - eOut(c / 1.5) * 60, title, sub, c, (i % 2 ? 1 : -1) * 0.04); out.restore() }
+      const fk = t - t0; if (fk >= 0 && fk < 0.12) { out.fillStyle = `rgba(255,236,246,${(1 - fk / 0.12) * 0.35})`; out.fillRect(0, 0, W, H) }
+    })
+    if (si >= 6 && t < BOOM) { const k = seg(t, 14.15, 0.5); lock(W * 0.5, H * 0.33, 290, k); tag(W * 0.5 - 290, H * 0.33 + 330, 'PLANILHA_FINAL_v7.xlsx' + (t > 14.9 ? ' · LOCKED' : '')) }
+    const fk = t - BOOM; if (fk > 0 && fk < 0.35) { out.fillStyle = `rgba(255,235,245,${(1 - fk / 0.35) * 0.8})`; out.fillRect(0, 0, W, H) }
+    if (t > BOOM) T('MISSÃO CUMPRIDA ✓', 70, 400, `400 28px ${M}`, MAG, { ls: 3 })
+  } else {
+    shade(0, 900, 0.7); shade(1250, H, 0.85, false)
+    meta('(06) MISSÃO CUMPRIDA', 'ASTROVIA SOLUTIONS', seg(t, 16.9, 0.6))
+    rise('ASTROVIA', W / 2, 470, `700 190px ${G}`, 190, IVORY, seg(t, 16.42, 0.55), { a: 'center', ls: -10, shadow: 40 })
+    rise('Automação & IA', 64, 1440, `700 92px ${G}`, 92, IVORY, seg(t, 17.8, 0.5), { ls: -4 })
+    rise('que trabalha', 64, 1536, `700 92px ${G}`, 92, IVORY, seg(t, 19.9, 0.45), { ls: -4, stroke: 2.5 })
+    rise('enquanto você vive.', 64, 1632, `700 92px ${G}`, 92, MAG, seg(t, 20.6, 0.45), { ls: -4 })
+    const lk = seg(t, 21.6, 0.6); if (lk > 0) { out.fillStyle = IVORY; out.fillRect(64, 1700, (W - 128) * eExpo(lk), 2) }
+    rise('Conheça nosso trabalho ↗', 64, 1776, `500 44px ${G}`, 44, IVORY, seg(t, 21.8, 0.5))
+    rise('astrovia-solutions.vercel.app', 64, 1830, `400 26px ${M}`, 26, '#CFC9D6', seg(t, 22.1, 0.5))
+  }
+  // flashes de corte e respiro final
+  ;[4.6, 9.4, 14.0, 16.4].forEach((c) => { const k = t - c; if (k >= 0 && k < 0.14) { out.fillStyle = `rgba(255,240,248,${(1 - k / 0.14) * (c === 16.4 ? 0.9 : 0.4)})`; out.fillRect(0, 0, W, H) } })
+  if (t > 16.0 && t < 16.4) { out.fillStyle = `rgba(255,236,246,${eIO(seg(t, 16.0, 0.4)) * 0.9})`; out.fillRect(0, 0, W, H) }
+  // grão, vinheta e entrada/saída em preto
+  out.save(); out.globalAlpha = 0.07; out.globalCompositeOperation = 'overlay'; out.fillStyle = out.createPattern(grain[Math.floor(t * FPS) % 4], 'repeat'); out.fillRect(0, 0, W, H); out.restore()
+  const vg = out.createRadialGradient(W / 2, 960, 600, W / 2, 960, 1250); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); out.fillStyle = vg; out.fillRect(0, 0, W, H)
+  const fade = Math.max(1 - seg(t, 0, 0.35), seg(t, TOTAL - 0.6, 0.6)); if (fade > 0) { out.fillStyle = `rgba(0,0,0,${fade})`; out.fillRect(0, 0, W, H) }
+}
+window.TOTAL = TOTAL; window.FPS = FPS
+</script></body></html>

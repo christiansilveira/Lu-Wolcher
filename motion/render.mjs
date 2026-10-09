@@ -12,7 +12,7 @@ const pg = await b.newPage({ viewport: { width: 1080, height: 1920 } })
 pg.on('pageerror', (e) => console.error('PAGEERR', e.message))
 await pg.goto(process.env.URL || 'http://127.0.0.1:8765/index.html')
 await pg.evaluate(() => window.ready)
-const grab = (t, type) => pg.evaluate(([t, type]) => { window.render(t); return document.getElementById('out').toDataURL(type, 0.95).split(',')[1] }, [t, type])
+const grab = (t, type) => pg.evaluate(async ([t, type]) => { await window.render(t); return document.getElementById('out').toDataURL(type, 0.95).split(',')[1] }, [t, type])
 
 if (args[0] === '--frames') {
   const { writeFileSync } = await import('node:fs')
